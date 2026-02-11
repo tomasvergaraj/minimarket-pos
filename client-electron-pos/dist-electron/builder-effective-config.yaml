@@ -1,0 +1,21 @@
+directories:
+  output: dist-electron
+  buildResources: build
+appId: com.minimarket.pos
+productName: MiniMarket POS
+files:
+  - filter:
+      - dist/**/*
+      - electron/**/*
+win:
+  target: nsis
+  icon: public/icon.ico
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: public/icon.ico
+publish:
+  provider: github
+  owner: your-github-user
+  repo: minimarket-pos
+electronVersion: 33.4.11

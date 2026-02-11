@@ -5,12 +5,13 @@ Runs as a background service on the server PC.
 import os
 import time
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 import schedule
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", "server-fastapi", ".env"))
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("sync-worker")
@@ -19,7 +20,16 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 LOCAL_DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/minimarket_pos")
 
-TABLES_TO_SYNC = ["products", "sales", "sale_items", "cash_sessions", "kardex", "users"]
+# Tables with their time column for incremental sync (order matters for FK constraints)
+TABLES_TO_SYNC = {
+    "users": "created_at",
+    "products": "created_at",
+    "cash_registers": "created_at",
+    "cash_sessions": "opened_at",
+    "sales": "created_at",
+    "sale_items": None,  # synced via sale_id join
+    "kardex": "created_at",
+}
 
 
 def check_internet() -> bool:
@@ -29,6 +39,16 @@ def check_internet() -> bool:
         return True
     except Exception:
         return False
+
+
+def serialize_row(row: dict) -> dict:
+    """Convert non-JSON-serializable types."""
+    for key, val in row.items():
+        if isinstance(val, datetime):
+            row[key] = val.isoformat()
+        elif isinstance(val, Decimal):
+            row[key] = float(val)
+    return row
 
 
 def sync_to_cloud():
@@ -49,28 +69,32 @@ def sync_to_cloud():
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
         engine = create_engine(LOCAL_DB_URL)
 
-        with engine.connect() as conn:
-            for table in TABLES_TO_SYNC:
-                try:
-                    # Get records modified in last hour
-                    if table in ("sales", "sale_items"):
-                        result = conn.execute(text(
-                            f"SELECT * FROM {table} WHERE created_at >= :since"
-                        ), {"since": datetime.utcnow() - timedelta(hours=1)})
-                    else:
-                        result = conn.execute(text(
-                            f"SELECT * FROM {table} WHERE updated_at >= :since OR created_at >= :since"
-                        ), {"since": datetime.utcnow() - timedelta(hours=1)})
+        since = datetime.now(timezone.utc) - timedelta(hours=1)
 
-                    rows = [dict(row._mapping) for row in result]
+        with engine.connect() as conn:
+            for table, time_col in TABLES_TO_SYNC.items():
+                try:
+                    if time_col:
+                        result = conn.execute(
+                            text(f"SELECT * FROM {table} WHERE {time_col} >= :since"),
+                            {"since": since},
+                        )
+                    elif table == "sale_items":
+                        # sale_items has no timestamp, sync via recent sales
+                        result = conn.execute(
+                            text(
+                                "SELECT si.* FROM sale_items si "
+                                "JOIN sales s ON si.sale_id = s.id "
+                                "WHERE s.created_at >= :since"
+                            ),
+                            {"since": since},
+                        )
+                    else:
+                        continue
+
+                    rows = [serialize_row(dict(row._mapping)) for row in result]
 
                     if rows:
-                        # Convert datetime objects to ISO strings
-                        for row in rows:
-                            for key, val in row.items():
-                                if isinstance(val, datetime):
-                                    row[key] = val.isoformat()
-
                         supabase.table(table).upsert(rows).execute()
                         logger.info(f"Synced {len(rows)} rows from {table}")
                     else:

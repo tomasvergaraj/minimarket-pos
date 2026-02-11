@@ -24,23 +24,26 @@ export default function POSPage() {
 
   // Barcode scanner: auto-search on input
   const handleSearch = useCallback(async (query: string) => {
-    if (!query.trim()) {
+    const trimmed = query.trim();
+    if (!trimmed) {
       setSearchResults([]);
       return;
     }
     try {
-      // Try barcode first
-      try {
-        const { data } = await api.get(`/products/barcode/${query.trim()}`);
-        addItem(data);
-        setSearchQuery("");
-        setSearchResults([]);
-        toast.success(`${data.name} agregado`);
-        return;
-      } catch {
-        // Not a barcode, search by name
+      // Only try barcode lookup if input is numeric (barcode scanner)
+      if (/^\d+$/.test(trimmed)) {
+        try {
+          const { data } = await api.get(`/products/barcode/${trimmed}`);
+          addItem(data);
+          setSearchQuery("");
+          setSearchResults([]);
+          toast.success(`${data.name} agregado`);
+          return;
+        } catch {
+          // Not a valid barcode, fall through to name search
+        }
       }
-      const { data } = await api.get("/products/", { params: { search: query } });
+      const { data } = await api.get("/products/", { params: { search: trimmed } });
       setSearchResults(data);
     } catch {
       toast.error("Error buscando productos");

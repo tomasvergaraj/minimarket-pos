@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import { formatCLP } from "@/utils/format";
+import api from "@/services/api";
 import toast from "react-hot-toast";
 import { X } from "lucide-react";
 
@@ -9,10 +10,19 @@ interface Props {
 }
 
 export default function CloseSessionModal({ onClose }: Props) {
-  const { session, closeSession, logout } = useAuthStore();
+  const { session, closeSession, logout, setSession } = useAuthStore();
   const [closingAmount, setClosingAmount] = useState("");
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+
+  // Refresh session data from server to get updated totals
+  useEffect(() => {
+    if (session?.id) {
+      api.get(`/cash/sessions/${session.id}`).then(({ data }) => {
+        setSession(data);
+      });
+    }
+  }, [session?.id, setSession]);
 
   const handleClose = async () => {
     setLoading(true);

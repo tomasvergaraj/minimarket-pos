@@ -13,7 +13,9 @@ export function buildReceiptContent(sale: Sale, storeName: string = "MINIMARKET 
       style: { fontSize: "11px", fontFamily: "monospace" },
     })),
     { type: "text", value: "================================", style: { textAlign: "center", fontFamily: "monospace" } },
-    { type: "text", value: `TOTAL: ${formatCLP(sale.total)}`, style: { textAlign: "right", fontWeight: "700", fontSize: "14px" } },
+    { type: "text", value: `Neto:   ${formatCLP(sale.total - sale.tax_amount)}`, style: { fontSize: "11px", fontFamily: "monospace" } },
+    { type: "text", value: `IVA 19%:${formatCLP(sale.tax_amount)}`, style: { fontSize: "11px", fontFamily: "monospace" } },
+    { type: "text", value: `TOTAL:  ${formatCLP(sale.total)}`, style: { textAlign: "right", fontWeight: "700", fontSize: "14px" } },
     ...(sale.change_amount > 0
       ? [{ type: "text" as const, value: `Vuelto: ${formatCLP(sale.change_amount)}`, style: { fontSize: "11px" } }]
       : []),

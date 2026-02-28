@@ -1,6 +1,11 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
 const { autoUpdater } = require("electron-updater");
+const log = require("electron-log");
 const path = require("path");
+
+// Pipe electron-updater logs to file
+autoUpdater.logger = log;
+autoUpdater.logger.transports.file.level = "info";
 
 let mainWindow;
 
@@ -15,7 +20,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
     },
-    title: "MiniMarket POS",
+    title: `MiniMarket POS v${app.getVersion()}`,
     autoHideMenuBar: true,
   });
 
@@ -27,6 +32,11 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
     autoUpdater.checkForUpdatesAndNotify();
   }
+
+  // Reapply title after page load (HTML <title> would otherwise override it)
+  mainWindow.webContents.on("did-finish-load", () => {
+    mainWindow.setTitle(`MiniMarket POS v${app.getVersion()}`);
+  });
 }
 
 app.whenReady().then(createWindow);
@@ -62,6 +72,11 @@ ipcMain.on("install-update", () => {
   autoUpdater.quitAndInstall();
 });
 
+// List available printers
+ipcMain.handle("get-printers", () => {
+  return mainWindow.webContents.getPrinters();
+});
+
 // Printing via electron-pos-printer
 ipcMain.handle("print-receipt", async (_event, data) => {
   try {
@@ -76,6 +91,8 @@ ipcMain.handle("print-receipt", async (_event, data) => {
     });
     return { success: true };
   } catch (err) {
-    return { success: false, error: err.message };
+    const msg = err?.message ?? (typeof err === "string" ? err : JSON.stringify(err)) ?? "Error desconocido";
+    log.error("print-receipt error:", err);
+    return { success: false, error: msg };
   }
 });

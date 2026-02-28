@@ -1,15 +1,47 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getServerUrl, setServerUrl } from "@/services/api";
 import toast from "react-hot-toast";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Printer, RefreshCw } from "lucide-react";
+
+const PRINTER_KEY = "printer_name";
+
+export function getSavedPrinterName(): string {
+  return localStorage.getItem(PRINTER_KEY) ?? "";
+}
 
 export default function SettingsPage() {
   const [url, setUrl] = useState(getServerUrl());
+  const [printers, setPrinters] = useState<PrinterInfo[]>([]);
+  const [selectedPrinter, setSelectedPrinter] = useState(getSavedPrinterName());
+  const [loadingPrinters, setLoadingPrinters] = useState(false);
   const navigate = useNavigate();
+
+  const loadPrinters = async () => {
+    if (!window.electronAPI?.getPrinters) return;
+    setLoadingPrinters(true);
+    try {
+      const list = await window.electronAPI.getPrinters();
+      setPrinters(list);
+      // Auto-select default if nothing saved
+      if (!selectedPrinter) {
+        const def = list.find((p: PrinterInfo) => p.isDefault);
+        if (def) setSelectedPrinter(def.name);
+      }
+    } catch {
+      toast.error("No se pudo obtener la lista de impresoras");
+    } finally {
+      setLoadingPrinters(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPrinters();
+  }, []);
 
   const handleSave = () => {
     setServerUrl(url);
+    localStorage.setItem(PRINTER_KEY, selectedPrinter);
     toast.success("Configuración guardada");
   };
 
@@ -23,6 +55,7 @@ export default function SettingsPage() {
         <div className="bg-white rounded-xl shadow p-6 space-y-6">
           <h2 className="text-xl font-bold text-gray-800">Configuración</h2>
 
+          {/* Server URL */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">URL del Servidor</label>
             <input
@@ -34,6 +67,50 @@ export default function SettingsPage() {
             />
             <p className="text-xs text-gray-500 mt-1">IP del PC servidor en la red local</p>
           </div>
+
+          {/* Printer selection */}
+          {window.electronAPI?.getPrinters && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700">
+                  <Printer size={14} className="inline mr-1" />
+                  Impresora térmica
+                </label>
+                <button
+                  onClick={loadPrinters}
+                  disabled={loadingPrinters}
+                  className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                >
+                  <RefreshCw size={12} className={loadingPrinters ? "animate-spin" : ""} />
+                  Actualizar
+                </button>
+              </div>
+
+              {printers.length === 0 && !loadingPrinters ? (
+                <p className="text-sm text-gray-400 border rounded-lg px-4 py-2">
+                  No se encontraron impresoras
+                </p>
+              ) : (
+                <select
+                  value={selectedPrinter}
+                  onChange={(e) => setSelectedPrinter(e.target.value)}
+                  className="w-full border rounded-lg px-4 py-2 text-sm"
+                  disabled={loadingPrinters}
+                >
+                  <option value="">— Sin impresora (desactivado) —</option>
+                  {printers.map((p) => (
+                    <option key={p.name} value={p.name}>
+                      {p.displayName || p.name}
+                      {p.isDefault ? " (predeterminada)" : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Selecciona la impresora térmica ESC/POS conectada
+              </p>
+            </div>
+          )}
 
           <button onClick={handleSave} className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium">
             Guardar

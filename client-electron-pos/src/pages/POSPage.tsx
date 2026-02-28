@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import type { Product, Sale } from "@/types";
 import PaymentModal from "@/components/PaymentModal";
 import CloseSessionModal from "@/components/CloseSessionModal";
-import ReceiptView from "@/components/ReceiptView";
+import ReceiptPreviewModal from "@/components/ReceiptPreviewModal";
 import { Search, Trash2, Plus, Minus, LogOut, X, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -172,12 +172,6 @@ export default function POSPage() {
             </div>
           )}
 
-          {/* Last sale receipt */}
-          {lastSale && (
-            <div className="flex-1 overflow-auto">
-              <ReceiptView sale={lastSale} onClose={() => setLastSale(null)} />
-            </div>
-          )}
         </div>
 
         {/* Right: Cart */}
@@ -264,6 +258,15 @@ export default function POSPage() {
 
       {showCloseSession && (
         <CloseSessionModal onClose={() => setShowCloseSession(false)} />
+      )}
+
+      {lastSale && (
+        <ReceiptPreviewModal
+          sale={lastSale}
+          sellerName={user?.full_name}
+          registerName={register?.name}
+          onClose={() => setLastSale(null)}
+        />
       )}
     </div>
   );

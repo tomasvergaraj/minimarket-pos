@@ -1,6 +1,6 @@
 {
   "name": "minimarket-pos",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "MiniMarket POS - Punto de Venta",
   "author": "tomasvergaraj",
   "main": "electron/main.js",
@@ -12,16 +12,17 @@
     "lint": "eslint . --ext ts,tsx"
   },
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.28.1",
-    "zustand": "^5.0.2",
     "axios": "^1.7.9",
-    "react-hot-toast": "^2.4.1",
-    "lucide-react": "^0.468.0",
+    "clsx": "^2.1.1",
+    "electron-log": "^5.4.3",
     "electron-pos-printer": "^1.3.6",
     "electron-updater": "^6.3.9",
-    "clsx": "^2.1.1"
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-hot-toast": "^2.4.1",
+    "react-router-dom": "^6.28.1",
+    "zustand": "^5.0.2"
   },
   "devDependencies": {
     "@types/react": "^18.3.14",
@@ -49,7 +50,8 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "public/icon.ico"
+      "icon": "public/icon.ico",
+      "artifactName": "MiniMarket-POS-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,

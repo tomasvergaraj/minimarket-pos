@@ -1,5 +1,8 @@
 from pydantic import BaseModel
 from datetime import datetime
+from typing import Literal
+
+from app.schemas.common import ApiError
 
 
 class UserCreate(BaseModel):
@@ -22,3 +25,17 @@ class UserOut(BaseModel):
 
 class PinLogin(BaseModel):
     pin: str
+
+
+class UserUpdate(BaseModel):
+    username: str | None = None
+    pin: str | None = None
+    full_name: str | None = None
+    role: Literal["admin", "cashier"] | None = None
+    is_active: bool | None = None
+
+
+class UserResponse(BaseModel):
+    success: bool = True
+    data: UserOut
+    error: ApiError | None = None

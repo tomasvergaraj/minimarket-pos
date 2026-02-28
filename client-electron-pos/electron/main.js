@@ -46,8 +46,16 @@ autoUpdater.on("update-available", () => {
   mainWindow?.webContents.send("update-available");
 });
 
+autoUpdater.on("download-progress", (progress) => {
+  mainWindow?.webContents.send("download-progress", Math.round(progress.percent));
+});
+
 autoUpdater.on("update-downloaded", () => {
   mainWindow?.webContents.send("update-downloaded");
+});
+
+autoUpdater.on("error", (err) => {
+  mainWindow?.webContents.send("update-error", err.message);
 });
 
 ipcMain.on("install-update", () => {

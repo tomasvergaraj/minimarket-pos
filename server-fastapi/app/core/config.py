@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     STORE_NAME: str = "MiniMarket POS"
     STORE_RUT: str = ""
     STORE_ADDRESS: str = ""
+    CORS_ORIGINS: str = "http://localhost:5174,http://127.0.0.1:5174"
 
     class Config:
         env_file = ".env"

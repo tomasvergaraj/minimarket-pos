@@ -1,0 +1,169 @@
+@import "tailwindcss";
+
+/* ─── Design System Tokens ─── */
+@theme {
+  /* Primary: deep indigo-blue — sobrio, profesional, no genérico */
+  --color-primary-50: #eef2ff;
+  --color-primary-100: #e0e7ff;
+  --color-primary-200: #c7d2fe;
+  --color-primary-300: #a5b4fc;
+  --color-primary-400: #818cf8;
+  --color-primary-500: #6366f1;
+  --color-primary-600: #4f46e5;
+  --color-primary-700: #4338ca;
+  --color-primary-800: #3730a3;
+  --color-primary-900: #312e81;
+
+  /* Surfaces */
+  --color-surface: #f9fafb;
+  --color-surface-card: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-surface-sidebar: #111827;
+  --color-surface-sidebar-hover: #1f2937;
+
+  /* Semantic */
+  --color-success: #059669;
+  --color-success-light: #ecfdf5;
+  --color-warning: #d97706;
+  --color-warning-light: #fffbeb;
+  --color-danger: #dc2626;
+  --color-danger-light: #fef2f2;
+
+  /* Text */
+  --color-text-primary: #111827;
+  --color-text-secondary: #4b5563;
+  --color-text-muted: #9ca3af;
+  --color-text-inverse: #f9fafb;
+
+  /* Borders */
+  --color-border: #e5e7eb;
+  --color-border-strong: #d1d5db;
+
+  /* Shadows — sólo 2 niveles */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.04);
+
+  /* Typography scale: 11 / 12 / 13 / 14 / 16 / 20 / 24 */
+  --text-caption: 0.6875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5rem;
+
+  /* Spacing scale: 2 / 4 / 6 / 8 / 12 / 16 / 20 / 24 / 32 / 48 */
+
+  /* Radius — contenido, no decorativo */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* Transitions */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 120ms;
+  --duration-normal: 180ms;
+}
+
+/* ─── Base Styles ─── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
+    sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  line-height: 1.5;
+  font-size: var(--text-base);
+}
+
+/* ─── Focus system — visible y consistente ─── */
+:focus-visible {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ─── Selection ─── */
+::selection {
+  background-color: var(--color-primary-100);
+  color: var(--color-primary-900);
+}
+
+/* ─── Scrollbar refinada ─── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* ─── Number input spinners ─── */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* ─── Utility classes del sistema ─── */
+.text-caption {
+  font-size: var(--text-caption);
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+}
+
+.animate-fade-in {
+  animation: fadeIn var(--duration-normal) var(--ease-out);
+}
+
+.animate-slide-up {
+  animation: slideUp var(--duration-normal) var(--ease-out);
+}
+
+.animate-scale-in {
+  animation: scaleIn var(--duration-normal) var(--ease-out);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}

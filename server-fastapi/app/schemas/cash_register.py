@@ -1,6 +1,8 @@
 from pydantic import BaseModel
 from datetime import datetime
 
+from app.schemas.common import ApiError, PaginationMeta
+
 
 class CashRegisterCreate(BaseModel):
     name: str
@@ -41,3 +43,10 @@ class CashSessionOut(BaseModel):
     closed_at: datetime | None
 
     model_config = {"from_attributes": True}
+
+
+class CashSessionListResponse(BaseModel):
+    success: bool = True
+    data: list[CashSessionOut]
+    error: ApiError | None = None
+    meta: PaginationMeta

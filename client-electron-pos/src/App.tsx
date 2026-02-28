@@ -6,6 +6,7 @@ import RegisterSelectPage from "@/pages/RegisterSelectPage";
 import OpenSessionPage from "@/pages/OpenSessionPage";
 import POSPage from "@/pages/POSPage";
 import SettingsPage from "@/pages/SettingsPage";
+import UpdateBanner from "@/components/UpdateBanner";
 
 export default function App() {
   const user = useAuthStore((s) => s.user);
@@ -15,6 +16,7 @@ export default function App() {
   return (
     <>
       <Toaster position="top-right" />
+      <UpdateBanner />
       <Routes>
         {!user ? (
           <Route path="*" element={<LoginPage />} />

@@ -21,8 +21,9 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 LOCAL_DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/minimarket_pos")
 
 # Tables with their time column for incremental sync (order matters for FK constraints)
+# Use updated_at when available so edits (not just inserts) are synced
 TABLES_TO_SYNC = {
-    "users": "created_at",
+    "users": "updated_at",
     "products": "created_at",
     "cash_registers": "created_at",
     "cash_sessions": "opened_at",

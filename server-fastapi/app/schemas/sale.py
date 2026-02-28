@@ -1,6 +1,8 @@
 from pydantic import BaseModel
 from datetime import datetime
 
+from app.schemas.common import ApiError, PaginationMeta
+
 
 class SaleItemCreate(BaseModel):
     product_id: str
@@ -49,3 +51,10 @@ class SaleOut(BaseModel):
     items: list[SaleItemOut]
 
     model_config = {"from_attributes": True}
+
+
+class SaleListResponse(BaseModel):
+    success: bool = True
+    data: list[SaleOut]
+    error: ApiError | None = None
+    meta: PaginationMeta

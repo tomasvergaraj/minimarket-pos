@@ -1,13 +1,14 @@
-from datetime import datetime
+from datetime import date, datetime, time, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.api.deps import require_admin
 from app.db.session import get_db
 from app.models.cash_register import CashRegister, CashSession, SessionStatus
 from app.schemas.cash_register import (
     CashRegisterCreate, CashRegisterOut,
-    CashSessionOpen, CashSessionClose, CashSessionOut,
+    CashSessionOpen, CashSessionClose, CashSessionOut, CashSessionListResponse,
 )
 
 router = APIRouter(prefix="/cash", tags=["cash"])
@@ -71,6 +72,43 @@ def close_session(session_id: str, data: CashSessionClose, db: Session = Depends
     db.commit()
     db.refresh(session)
     return session
+
+
+@router.get("/sessions", response_model=CashSessionListResponse, dependencies=[Depends(require_admin)])
+def list_sessions(
+    register_id: str | None = Query(default=None),
+    status: SessionStatus | None = Query(default=None),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+):
+    q = db.query(CashSession)
+    if register_id:
+        q = q.filter(CashSession.register_id == register_id)
+    if status:
+        q = q.filter(CashSession.status == status)
+    if date_from:
+        q = q.filter(CashSession.opened_at >= datetime.combine(date_from, time.min))
+    if date_to:
+        end_date = datetime.combine(date_to + timedelta(days=1), time.min)
+        q = q.filter(CashSession.opened_at < end_date)
+
+    total = q.count()
+    sessions = q.order_by(CashSession.opened_at.desc()).offset(skip).limit(limit).all()
+
+    return {
+        "success": True,
+        "data": sessions,
+        "error": None,
+        "meta": {
+            "total": total,
+            "skip": skip,
+            "limit": limit,
+            "has_more": skip + len(sessions) < total,
+        },
+    }
 
 
 @router.get("/sessions/active", response_model=list[CashSessionOut])

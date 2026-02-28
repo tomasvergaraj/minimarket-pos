@@ -40,7 +40,7 @@ export default function LoginPage() {
         <div className="bg-gray-100 rounded-lg p-4 mb-6 text-center">
           <span className="text-3xl tracking-[0.5em] font-mono">
             {"*".repeat(pin.length)}
-            <span className="opacity-30">{"_".repeat(4 - pin.length)}</span>
+            <span className="opacity-30">{"_".repeat(6 - pin.length)}</span>
           </span>
         </div>
 

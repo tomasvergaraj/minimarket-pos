@@ -1,7 +1,8 @@
 {
   "name": "minimarket-pos",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "MiniMarket POS - Punto de Venta",
+  "author": "tomasvergaraj",
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
@@ -57,7 +58,7 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "your-github-user",
+      "owner": "tomasvergaraj",
       "repo": "minimarket-pos"
     }
   }

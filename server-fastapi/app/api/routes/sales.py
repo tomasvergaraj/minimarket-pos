@@ -1,8 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import date, datetime, time, timedelta
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.api.deps import require_admin
 from app.db.session import get_db
-from app.schemas.sale import SaleCreate, SaleOut
+from app.models.sale import Sale, SaleStatus
+from app.schemas.sale import SaleCreate, SaleOut, SaleListResponse
 from app.services.sale_service import create_sale, void_sale
 
 router = APIRouter(prefix="/sales", tags=["sales"])
@@ -19,11 +23,48 @@ def post_sale(data: SaleCreate, db: Session = Depends(get_db)):
 
 @router.get("/{sale_id}", response_model=SaleOut)
 def get_sale(sale_id: str, db: Session = Depends(get_db)):
-    from app.models.sale import Sale
     sale = db.query(Sale).filter(Sale.id == sale_id).first()
     if not sale:
         raise HTTPException(404, "Sale not found")
     return sale
+
+
+@router.get("/", response_model=SaleListResponse, dependencies=[Depends(require_admin)])
+def list_sales(
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    register_id: str | None = Query(default=None),
+    status: SaleStatus | None = Query(default=None),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+):
+    q = db.query(Sale)
+
+    if register_id:
+        q = q.filter(Sale.register_id == register_id)
+    if status:
+        q = q.filter(Sale.status == status)
+    if date_from:
+        q = q.filter(Sale.created_at >= datetime.combine(date_from, time.min))
+    if date_to:
+        end_date = datetime.combine(date_to + timedelta(days=1), time.min)
+        q = q.filter(Sale.created_at < end_date)
+
+    total = q.count()
+    sales = q.order_by(Sale.created_at.desc()).offset(skip).limit(limit).all()
+
+    return {
+        "success": True,
+        "data": sales,
+        "error": None,
+        "meta": {
+            "total": total,
+            "skip": skip,
+            "limit": limit,
+            "has_more": skip + len(sales) < total,
+        },
+    }
 
 
 @router.post("/{sale_id}/void", response_model=SaleOut)

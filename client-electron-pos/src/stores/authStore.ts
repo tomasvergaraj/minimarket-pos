@@ -27,7 +27,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ user: data });
   },
 
-  logout: () => set({ user: null, session: null }),
+  logout: () => set({ user: null, session: null, register: null }),
 
   fetchRegisters: async () => {
     const { data } = await api.get("/cash/registers");

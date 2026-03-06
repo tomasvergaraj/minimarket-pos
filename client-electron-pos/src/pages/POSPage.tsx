@@ -8,8 +8,32 @@ import type { Product, Sale } from "@/types";
 import PaymentModal from "@/components/PaymentModal";
 import CloseSessionModal from "@/components/CloseSessionModal";
 import ReceiptPreviewModal from "@/components/ReceiptPreviewModal";
-import { Search, Trash2, Plus, Minus, LogOut, X, Settings } from "lucide-react";
+import { Search, Trash2, Plus, Minus, LogOut, X, Settings, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+
+/** Devuelve clase de color según stock disponible vs mínimo */
+function stockColor(stock: number, minStock: number) {
+  if (stock <= 0) return "text-red-600 font-semibold";
+  if (stock <= minStock) return "text-yellow-600 font-semibold";
+  return "text-green-600";
+}
+
+/** Badge de stock para el carrito: muestra unidades restantes tras restar lo del carrito */
+function StockBadge({ remaining, minStock }: { remaining: number; minStock: number }) {
+  if (remaining > minStock) return null; // suficiente stock, no molesta
+  if (remaining <= 0) {
+    return (
+      <span className="flex items-center gap-1 text-xs text-red-600 font-semibold">
+        <AlertTriangle size={11} /> Sin stock disponible
+      </span>
+    );
+  }
+  return (
+    <span className="flex items-center gap-1 text-xs text-yellow-600 font-semibold">
+      <AlertTriangle size={11} /> Solo quedan {remaining}
+    </span>
+  );
+}
 
 export default function POSPage() {
   const { user, register, session } = useAuthStore();
@@ -22,6 +46,20 @@ export default function POSPage() {
   const searchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
+  const tryAddItem = useCallback((product: Product) => {
+    if (product.stock <= 0) {
+      toast.error(`${product.name}: sin stock`);
+      return;
+    }
+    const ok = addItem(product);
+    if (!ok) {
+      const inCart = items.find((i) => i.product.id === product.id)?.quantity ?? 0;
+      toast.error(`Stock insuficiente — máx. ${product.stock} (${inCart} en carrito)`);
+    } else {
+      toast.success(`${product.name} agregado`);
+    }
+  }, [addItem, items]);
+
   // Barcode scanner: auto-search on input
   const handleSearch = useCallback(async (query: string) => {
     const trimmed = query.trim();
@@ -30,14 +68,12 @@ export default function POSPage() {
       return;
     }
     try {
-      // Only try barcode lookup if input is numeric (barcode scanner)
       if (/^\d+$/.test(trimmed)) {
         try {
           const { data } = await api.get(`/products/barcode/${trimmed}`);
-          addItem(data);
+          tryAddItem(data);
           setSearchQuery("");
           setSearchResults([]);
-          toast.success(`${data.name} agregado`);
           return;
         } catch {
           // Not a valid barcode, fall through to name search
@@ -48,7 +84,7 @@ export default function POSPage() {
     } catch {
       toast.error("Error buscando productos");
     }
-  }, [addItem]);
+  }, [tryAddItem]);
 
   // Debounced search
   useEffect(() => {
@@ -78,7 +114,6 @@ export default function POSPage() {
     return () => window.removeEventListener("keydown", handler);
   }, [items]);
 
-  // Handle barcode scanner (Enter = submit barcode)
   const handleSearchKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -148,30 +183,39 @@ export default function POSPage() {
           {/* Search results */}
           {searchResults.length > 0 && (
             <div className="bg-white rounded-xl border shadow-sm mb-4 max-h-64 overflow-y-auto">
-              {searchResults.map((product) => (
-                <button
-                  key={product.id}
-                  onClick={() => {
-                    addItem(product);
-                    setSearchQuery("");
-                    setSearchResults([]);
-                    toast.success(`${product.name} agregado`);
-                    searchRef.current?.focus();
-                  }}
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-blue-50 border-b last:border-0 transition"
-                >
-                  <div className="text-left">
-                    <p className="font-medium text-gray-800">{product.name}</p>
-                    <p className="text-sm text-gray-500">
-                      {product.sku} {product.barcode && `| ${product.barcode}`} | Stock: {product.stock}
-                    </p>
-                  </div>
-                  <span className="font-bold text-blue-600 text-lg">{formatCLP(product.sell_price)}</span>
-                </button>
-              ))}
+              {searchResults.map((product) => {
+                const inCart = items.find((i) => i.product.id === product.id)?.quantity ?? 0;
+                const remaining = product.stock - inCart;
+                const outOfStock = remaining <= 0;
+                return (
+                  <button
+                    key={product.id}
+                    onClick={() => {
+                      tryAddItem(product);
+                      setSearchQuery("");
+                      setSearchResults([]);
+                      searchRef.current?.focus();
+                    }}
+                    disabled={outOfStock}
+                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed border-b last:border-0 transition"
+                  >
+                    <div className="text-left">
+                      <p className="font-medium text-gray-800">{product.name}</p>
+                      <p className="text-sm text-gray-500">
+                        {product.sku} {product.barcode && `| ${product.barcode}`}
+                        {" | "}
+                        <span className={stockColor(remaining, product.min_stock)}>
+                          Stock: {product.stock}
+                          {inCart > 0 && ` (${inCart} en carrito)`}
+                        </span>
+                      </p>
+                    </div>
+                    <span className="font-bold text-blue-600 text-lg">{formatCLP(product.sell_price)}</span>
+                  </button>
+                );
+              })}
             </div>
           )}
-
         </div>
 
         {/* Right: Cart */}
@@ -195,37 +239,49 @@ export default function POSPage() {
               </div>
             ) : (
               <div className="divide-y">
-                {items.map((item) => (
-                  <div key={item.product.id} className="p-3 hover:bg-gray-50">
-                    <div className="flex justify-between items-start mb-1">
-                      <p className="font-medium text-gray-800 text-sm flex-1 pr-2">{item.product.name}</p>
-                      <button onClick={() => removeItem(item.product.id)} className="text-red-400 hover:text-red-600 shrink-0">
-                        <X size={16} />
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                          className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg"
-                        >
-                          <Minus size={14} />
-                        </button>
-                        <span className="w-10 text-center font-mono font-bold">{item.quantity}</span>
-                        <button
-                          onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                          className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg"
-                        >
-                          <Plus size={14} />
+                {items.map((item) => {
+                  const remaining = item.product.stock - item.quantity;
+                  const atLimit = item.quantity >= item.product.stock;
+                  return (
+                    <div key={item.product.id} className="p-3 hover:bg-gray-50">
+                      <div className="flex justify-between items-start mb-1">
+                        <p className="font-medium text-gray-800 text-sm flex-1 pr-2">{item.product.name}</p>
+                        <button onClick={() => removeItem(item.product.id)} className="text-red-400 hover:text-red-600 shrink-0">
+                          <X size={16} />
                         </button>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xs text-gray-500">{formatCLP(item.product.sell_price)} c/u</p>
-                        <p className="font-bold text-gray-800">{formatCLP(item.subtotal)}</p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                            className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg"
+                          >
+                            <Minus size={14} />
+                          </button>
+                          <span className="w-10 text-center font-mono font-bold">{item.quantity}</span>
+                          <button
+                            onClick={() => {
+                              const ok = updateQuantity(item.product.id, item.quantity + 1);
+                              if (!ok) toast.error(`Stock máximo: ${item.product.stock}`);
+                            }}
+                            disabled={atLimit}
+                            className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg"
+                          >
+                            <Plus size={14} />
+                          </button>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-gray-500">{formatCLP(item.product.sell_price)} c/u</p>
+                          <p className="font-bold text-gray-800">{formatCLP(item.subtotal)}</p>
+                        </div>
+                      </div>
+                      {/* Stock indicator */}
+                      <div className="mt-1">
+                        <StockBadge remaining={remaining} minStock={item.product.min_stock} />
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

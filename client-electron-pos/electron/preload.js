@@ -12,4 +12,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("update-downloaded", callback),
   onUpdateError: (callback) =>
     ipcRenderer.on("update-error", (_e, msg) => callback(msg)),
+  setFullscreen: (value) => ipcRenderer.invoke("set-fullscreen", value),
+  isFullscreen: () => ipcRenderer.invoke("is-fullscreen"),
 });

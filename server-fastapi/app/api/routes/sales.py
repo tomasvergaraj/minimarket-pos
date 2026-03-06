@@ -1,6 +1,6 @@
 from datetime import date, datetime, time, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin
@@ -8,14 +8,21 @@ from app.db.session import get_db
 from app.models.sale import Sale, SaleStatus
 from app.schemas.sale import SaleCreate, SaleOut, SaleListResponse
 from app.services.sale_service import create_sale, void_sale
+from app.tax.sii.service import background_upload
 
 router = APIRouter(prefix="/sales", tags=["sales"])
 
 
 @router.post("/", response_model=SaleOut, status_code=201)
-def post_sale(data: SaleCreate, db: Session = Depends(get_db)):
+def post_sale(
+    data: SaleCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     try:
-        sale = create_sale(db, data)
+        sale, dte_bytes = create_sale(db, data)
+        if dte_bytes is not None:
+            background_tasks.add_task(background_upload, sale.id, dte_bytes)
         return sale
     except ValueError as e:
         raise HTTPException(400, str(e))

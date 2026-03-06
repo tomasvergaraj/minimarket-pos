@@ -27,7 +27,7 @@ export default function CloseSessionModal({ onClose }: Props) {
   const handleClose = async () => {
     setLoading(true);
     try {
-      const data = await closeSession(parseInt(closingAmount) || 0);
+      const data = await closeSession(parseInt(closingAmount.replace(/\./g, ""), 10) || 0);
       setResult(data);
       toast.success("Caja cerrada correctamente");
     } catch (err: any) {
@@ -113,11 +113,12 @@ export default function CloseSessionModal({ onClose }: Props) {
 
         <label className="block text-sm font-medium text-gray-700 mb-1">Efectivo contado en caja</label>
         <input
-          type="number"
+          type="text"
+          inputMode="numeric"
           value={closingAmount}
-          onChange={(e) => setClosingAmount(e.target.value)}
+          onChange={(e) => setClosingAmount(e.target.value.replace(/[^\d.]/g, ""))}
           className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-xl font-mono text-center focus:border-blue-500 focus:outline-none mb-4"
-          placeholder="$0"
+          placeholder="0"
           autoFocus
         />
 

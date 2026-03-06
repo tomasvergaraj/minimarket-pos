@@ -14,6 +14,8 @@ interface ElectronAPI {
   onDownloadProgress: (callback: (percent: number) => void) => void;
   onUpdateDownloaded: (callback: () => void) => void;
   onUpdateError: (callback: (msg: string) => void) => void;
+  setFullscreen?: (value: boolean) => Promise<void>;
+  isFullscreen?: () => Promise<boolean>;
 }
 
 interface Window {

@@ -48,6 +48,12 @@ export interface Sale {
   card_amount: number;
   change_amount: number;
   status: string;
+  // SII Boleta Electrónica
+  sii_tipo_dte: number | null;
+  sii_folio: number | null;
+  sii_rut_receptor: string | null;
+  sii_status: string | null;
+  sii_ted_xml: string | null;
   created_at: string;
   items: SaleItem[];
 }

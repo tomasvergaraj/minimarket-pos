@@ -47,6 +47,12 @@ class SaleOut(BaseModel):
     card_amount: float
     change_amount: float
     status: str
+    # Campos SII (None cuando la integración no está activa)
+    sii_tipo_dte: int | None = None
+    sii_folio: int | None = None
+    sii_rut_receptor: str | None = None
+    sii_status: str | None = None
+    sii_ted_xml: str | None = None
     created_at: datetime
     items: list[SaleItemOut]
 

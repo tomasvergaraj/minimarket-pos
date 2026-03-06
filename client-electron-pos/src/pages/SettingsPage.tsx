@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getServerUrl, setServerUrl } from "@/services/api";
 import toast from "react-hot-toast";
-import { ArrowLeft, Printer, RefreshCw } from "lucide-react";
+import { ArrowLeft, Printer, RefreshCw, Maximize, Minimize } from "lucide-react";
 
 const PRINTER_KEY = "printer_name";
 
@@ -15,7 +15,18 @@ export default function SettingsPage() {
   const [printers, setPrinters] = useState<PrinterInfo[]>([]);
   const [selectedPrinter, setSelectedPrinter] = useState(getSavedPrinterName());
   const [loadingPrinters, setLoadingPrinters] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    window.electronAPI?.isFullscreen?.().then((v) => setIsFullscreen(!!v));
+  }, []);
+
+  const toggleFullscreen = async () => {
+    const next = !isFullscreen;
+    await window.electronAPI?.setFullscreen?.(next);
+    setIsFullscreen(next);
+  };
 
   const loadPrinters = async () => {
     if (!window.electronAPI?.getPrinters) return;
@@ -109,6 +120,23 @@ export default function SettingsPage() {
               <p className="text-xs text-gray-500 mt-1">
                 Selecciona la impresora térmica ESC/POS conectada
               </p>
+            </div>
+          )}
+
+          {/* Pantalla completa */}
+          {window.electronAPI?.setFullscreen && (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Pantalla completa</p>
+                <p className="text-xs text-gray-500">También puedes usar F11</p>
+              </div>
+              <button
+                onClick={toggleFullscreen}
+                className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition"
+              >
+                {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+                {isFullscreen ? "Salir" : "Activar"}
+              </button>
             </div>
           )}
 

@@ -6,9 +6,10 @@ from app.models.sale import Sale, SaleItem, PaymentMethod, SaleStatus
 from app.models.cash_register import CashSession
 from app.models.kardex import KardexEntry, MovementType
 from app.schemas.sale import SaleCreate
+from app.tax.sii.service import emit_boleta
 
 
-def create_sale(db: Session, data: SaleCreate) -> Sale:
+def create_sale(db: Session, data: SaleCreate) -> tuple[Sale, bytes | None]:
     session = db.query(CashSession).filter(CashSession.id == data.cash_session_id).with_for_update().first()
     if not session or session.status.value != "open":
         raise ValueError("Cash session is not open")
@@ -93,7 +94,12 @@ def create_sale(db: Session, data: SaleCreate) -> Sale:
 
     db.commit()
     db.refresh(sale)
-    return sale
+
+    # Emisión DTE (después del commit; sii_status queda en PENDING si OK)
+    dte_bytes = emit_boleta(db, sale)
+    db.refresh(sale)  # recargar sii_folio/sii_status desde DB tras el commit de emit_boleta
+
+    return sale, dte_bytes
 
 
 def void_sale(db: Session, sale_id: str) -> Sale:

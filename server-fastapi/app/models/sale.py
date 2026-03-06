@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+import sqlalchemy as sa
 from sqlalchemy import String, Integer, Numeric, DateTime, ForeignKey, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
@@ -43,6 +44,7 @@ class Sale(Base):
     sii_folio: Mapped[int | None] = mapped_column(Integer, nullable=True)
     sii_rut_receptor: Mapped[str | None] = mapped_column(String(12), nullable=True)
     sii_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    sii_ted_xml: Mapped[str | None] = mapped_column(sa.Text, nullable=True)  # <TED>...</TED> firmado
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, globalShortcut } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
 const path = require("path");
@@ -37,9 +37,21 @@ function createWindow() {
   mainWindow.webContents.on("did-finish-load", () => {
     mainWindow.setTitle(`MiniMarket POS v${app.getVersion()}`);
   });
+
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createWindow();
+
+  // F11 → toggle fullscreen (globalShortcut evita que Chromium lo intercepte)
+  globalShortcut.register("F11", () => {
+    if (mainWindow) mainWindow.setFullScreen(!mainWindow.isFullScreen());
+  });
+});
+
+app.on("will-quit", () => {
+  globalShortcut.unregisterAll();
+});
 
 app.on("window-all-closed", () => {
   app.quit();
@@ -70,6 +82,15 @@ autoUpdater.on("error", (err) => {
 
 ipcMain.on("install-update", () => {
   autoUpdater.quitAndInstall();
+});
+
+// Fullscreen toggle via IPC
+ipcMain.handle("set-fullscreen", (_event, value) => {
+  mainWindow.setFullScreen(value);
+});
+
+ipcMain.handle("is-fullscreen", () => {
+  return mainWindow.isFullScreen();
 });
 
 // List available printers

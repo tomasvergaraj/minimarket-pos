@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import type { Sale } from "@/types";
 import { formatCLP, formatDate } from "@/utils/format";
 import { Printer, X, Settings } from "lucide-react";
@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { buildReceiptContent } from "@/services/printer";
 import { getSavedPrinterName } from "@/pages/SettingsPage";
 import { useNavigate } from "react-router-dom";
+import PDF417Barcode from "@/components/PDF417Barcode";
 
 interface Props {
   sale: Sale;
@@ -24,6 +25,7 @@ export default function ReceiptPreviewModal({ sale, onClose, sellerName, registe
   const navigate = useNavigate();
   const printerName = getSavedPrinterName();
   const canPrint = !!window.electronAPI && !!printerName;
+  const [barcodeDataUrl, setBarcodeDataUrl] = useState<string | undefined>(undefined);
 
   const handlePrint = useCallback(async () => {
     if (!window.electronAPI) {
@@ -34,7 +36,7 @@ export default function ReceiptPreviewModal({ sale, onClose, sellerName, registe
       toast.error("Configura una impresora en Configuración antes de imprimir");
       return;
     }
-    const content = buildReceiptContent(sale);
+    const content = buildReceiptContent(sale, barcodeDataUrl);
     const result = await window.electronAPI.printReceipt({ content, printerName });
     if (result.success) {
       toast.success("Ticket impreso");
@@ -42,7 +44,7 @@ export default function ReceiptPreviewModal({ sale, onClose, sellerName, registe
     } else {
       toast.error(`Error al imprimir: ${result.error}`);
     }
-  }, [sale, onClose, printerName]);
+  }, [sale, onClose, printerName, barcodeDataUrl]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -86,7 +88,14 @@ export default function ReceiptPreviewModal({ sale, onClose, sellerName, registe
             <div className="border-t border-dashed border-gray-400 my-2" />
 
             <div className="text-center text-xs text-gray-500 space-y-0.5">
-              <p className="font-semibold text-gray-800">BOLETA N° {sale.sale_number}</p>
+              {sale.sii_folio ? (
+                <>
+                  <p className="font-bold text-gray-900 text-sm tracking-wider">BOLETA ELECTRONICA</p>
+                  <p className="font-bold text-gray-900 text-base">N° {sale.sii_folio}</p>
+                </>
+              ) : (
+                <p className="font-semibold text-gray-800">BOLETA N° {sale.sale_number}</p>
+              )}
               <p>{formatDate(sale.created_at)}</p>
               {sellerName && <p>Cajero: {sellerName}</p>}
             </div>
@@ -159,6 +168,31 @@ export default function ReceiptPreviewModal({ sale, onClose, sellerName, registe
             <p className="text-center text-xs text-gray-400 tracking-wide">
               *** GRACIAS POR SU COMPRA ***
             </p>
+
+            {/* Pie DTE con PDF417 */}
+            {sale.sii_folio && sale.sii_ted_xml && (
+              <>
+                <div className="border-t border-dashed border-gray-300 my-2" />
+                <div className="flex flex-col items-center gap-1">
+                  <PDF417Barcode
+                    tedXml={sale.sii_ted_xml}
+                    className="max-w-full"
+                    onDataUrl={setBarcodeDataUrl}
+                  />
+                  <div className="text-center space-y-0.5" style={{ fontSize: "9px" }}>
+                    <p className="text-gray-500">DTE Tipo 39 &nbsp;|&nbsp; Folio: {sale.sii_folio}</p>
+                    <p className={
+                      sale.sii_status === "SENT" ? "text-green-600 font-semibold" :
+                      sale.sii_status === "PENDING" ? "text-yellow-600" :
+                      "text-red-500"
+                    }>
+                      SII: {sale.sii_status ?? "PENDIENTE"}
+                    </p>
+                    <p className="text-gray-400">Verifique en sii.cl/validardoc</p>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Bottom torn edge */}

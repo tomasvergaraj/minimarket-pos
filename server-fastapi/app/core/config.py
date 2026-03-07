@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     def SII_BASE_URL(self) -> str:
         if self.SII_AMBIENTE == "production":
             return "https://palena.sii.cl"
-        return "https://maullin2.sii.cl"
+        return "https://maullin.sii.cl"
 
     class Config:
         env_file = ".env"

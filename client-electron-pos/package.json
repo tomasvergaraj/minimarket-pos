@@ -9,6 +9,7 @@
     "build": "tsc && vite build",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "electron:build": "tsc && vite build && electron-builder",
+    "electron:release": "tsc && vite build && electron-builder --publish always",
     "lint": "eslint . --ext ts,tsx"
   },
   "dependencies": {

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.deps import require_admin
 from app.core.config import settings
-from app.api.routes import products, sales, cash, kardex, reports, users, dashboard
+from app.api.routes import products, sales, cash, kardex, reports, users, dashboard, orders
 from app.schemas.config import ConfigUpdate, ConfigResponse
 from app.tax.sii.boleta import router as sii_router
 
@@ -30,6 +30,7 @@ app.include_router(kardex.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
+app.include_router(orders.router, prefix="/api")
 app.include_router(sii_router, prefix="/api")
 
 

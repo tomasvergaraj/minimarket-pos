@@ -1,5 +1,30 @@
-import type { Sale } from "@/types";
+import type { Sale, Order } from "@/types";
 import { formatCLP, formatDate } from "@/utils/format";
+
+/** Builds the ESC/POS content for a comanda (order ticket) */
+export function buildOrderContent(order: Order, storeName: string = "MINIMARKET POS") {
+  const sep = "================================";
+  return [
+    { type: "text" as const, value: storeName, style: { textAlign: "center", fontWeight: "700", fontSize: "14px", fontFamily: "monospace" } },
+    { type: "text" as const, value: "--- COMANDA ---", style: { textAlign: "center", fontWeight: "700", fontSize: "13px", fontFamily: "monospace" } },
+    { type: "text" as const, value: `N° ${order.order_number}`, style: { textAlign: "center", fontWeight: "700", fontSize: "16px" } },
+    ...(order.reference
+      ? [{ type: "text" as const, value: `Ref: ${order.reference}`, style: { textAlign: "center", fontSize: "12px", fontFamily: "monospace" } }]
+      : []),
+    { type: "text" as const, value: formatDate(order.created_at), style: { textAlign: "center", fontSize: "10px" } },
+    { type: "text" as const, value: sep, style: { textAlign: "center", fontFamily: "monospace" } },
+    ...order.items.map((item) => ({
+      type: "text" as const,
+      value: `${item.quantity}x  ${item.product_name}`,
+      style: { fontSize: "12px", fontFamily: "monospace", fontWeight: "600" },
+    })),
+    { type: "text" as const, value: sep, style: { textAlign: "center", fontFamily: "monospace" } },
+    ...(order.notes
+      ? [{ type: "text" as const, value: `Nota: ${order.notes}`, style: { fontSize: "11px", fontFamily: "monospace" } }]
+      : []),
+    { type: "text" as const, value: " ", style: {} },
+  ];
+}
 
 export function buildReceiptContent(sale: Sale, barcodeDataUrl?: string, storeName: string = "MINIMARKET POS") {
   const isDte = sale.sii_folio != null;

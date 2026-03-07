@@ -52,19 +52,30 @@ jobs:
         working-directory: client-electron-pos
         run: npm ci
 
+      - name: Install rsvg-convert (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y librsvg2-bin
+
       - name: Generate PNG icon from SVG (Linux)
         if: runner.os == 'Linux'
         run: |
-          convert -background none client-electron-pos/public/icon.svg \
-            -resize 512x512 client-electron-pos/public/icon.png
+          rsvg-convert -w 512 -h 512 \
+            client-electron-pos/public/icon.svg \
+            -o client-electron-pos/public/icon.png
 
       - name: Build (TypeScript + Vite)
         working-directory: client-electron-pos
         run: npm run build
 
-      - name: Package with electron-builder
+      - name: Package Windows
+        if: runner.os == 'Windows'
         working-directory: client-electron-pos
-        run: npx electron-builder --publish never
+        run: npx electron-builder --win --publish never
+
+      - name: Package Linux (AppImage only)
+        if: runner.os == 'Linux'
+        working-directory: client-electron-pos
+        run: npx electron-builder --linux AppImage --publish never
 
       - name: Upload Windows artifacts
         if: runner.os == 'Windows'
@@ -91,13 +102,6 @@ jobs:
             "client-electron-pos/dist-electron/latest-linux.yml" \
             --repo "${{ github.repository }}" \
             --clobber
-          # deb es opcional, no falla si no existe
-          if [ -f "client-electron-pos/dist-electron/MiniMarket-POS-${VERSION}.deb" ]; then
-            gh release upload "${{ github.ref_name }}" \
-              "client-electron-pos/dist-electron/MiniMarket-POS-${VERSION}.deb" \
-              --repo "${{ github.repository }}" \
-              --clobber
-          fi
 
   # 3. Publica el release sólo cuando ambas plataformas terminaron
   publish:

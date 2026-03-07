@@ -1,6 +1,6 @@
 {
   "name": "minimarket-pos",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "MiniMarket POS - Punto de Venta",
   "author": "tomasvergaraj",
   "main": "electron/main.js",
@@ -56,7 +56,10 @@
       "artifactName": "MiniMarket-POS-Setup-${version}.${ext}"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "category": "Office",
       "icon": "public/icon.png",
       "artifactName": "MiniMarket-POS-${version}.${ext}"

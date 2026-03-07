@@ -1,0 +1,50 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.label }})
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            label: Windows
+          - os: ubuntu-latest
+            label: Linux
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: client-electron-pos/package-lock.json
+
+      - name: Install dependencies
+        working-directory: client-electron-pos
+        run: npm ci
+
+      - name: Generate PNG icon from SVG (Linux only)
+        if: runner.os == 'Linux'
+        run: |
+          convert -background none client-electron-pos/public/icon.svg \
+            -resize 512x512 client-electron-pos/public/icon.png
+
+      - name: Build & publish
+        working-directory: client-electron-pos
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run electron:release

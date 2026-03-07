@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#1e3a8a"/>
+    </linearGradient>
+    <linearGradient id="base" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- App background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+
+  <!-- Monitor bezel -->
+  <rect x="72" y="56" width="368" height="240" rx="20" fill="white" opacity="0.12"/>
+  <rect x="72" y="56" width="368" height="240" rx="20" fill="none" stroke="white" stroke-width="5" opacity="0.85"/>
+
+  <!-- Screen -->
+  <rect x="88" y="72" width="336" height="208" rx="12" fill="#0f172a"/>
+
+  <!-- Screen: item lines (top) -->
+  <rect x="112" y="96"  width="288" height="9" rx="4" fill="#1e3a8a" opacity="0.9"/>
+  <rect x="112" y="113" width="200" height="9" rx="4" fill="#1e3a8a" opacity="0.6"/>
+
+  <!-- Main price symbol -->
+  <text
+    x="256" y="176"
+    font-family="ui-monospace, 'Courier New', monospace"
+    font-size="108" font-weight="900"
+    fill="#4ade80"
+    text-anchor="middle" dominant-baseline="middle">$</text>
+
+  <!-- Screen: total lines (bottom) -->
+  <rect x="112" y="240" width="288" height="9" rx="4" fill="#1e3a8a" opacity="0.9"/>
+  <rect x="112" y="257" width="180" height="9" rx="4" fill="#4ade80" opacity="0.65"/>
+
+  <!-- Connector neck -->
+  <rect x="224" y="296" width="64" height="32" rx="5" fill="white" opacity="0.9"/>
+
+  <!-- Terminal base -->
+  <rect x="72" y="328" width="368" height="128" rx="20" fill="url(#base)"/>
+
+  <!-- Barcode strips (left of base) -->
+  <rect x="100" y="352" width="5"  height="80" rx="2" fill="#94a3b8"/>
+  <rect x="112" y="352" width="9"  height="80" rx="2" fill="#94a3b8"/>
+  <rect x="128" y="352" width="5"  height="80" rx="2" fill="#94a3b8"/>
+  <rect x="140" y="352" width="7"  height="80" rx="2" fill="#94a3b8"/>
+  <rect x="154" y="352" width="4"  height="80" rx="2" fill="#94a3b8"/>
+  <rect x="165" y="352" width="10" height="80" rx="2" fill="#94a3b8"/>
+  <rect x="182" y="352" width="5"  height="80" rx="2" fill="#94a3b8"/>
+  <rect x="194" y="352" width="7"  height="80" rx="2" fill="#94a3b8"/>
+
+  <!-- Keypad 3×3 (right of base) -->
+  <rect x="284" y="348" width="32" height="24" rx="6" fill="#bfdbfe"/>
+  <rect x="328" y="348" width="32" height="24" rx="6" fill="#bfdbfe"/>
+  <rect x="372" y="348" width="32" height="24" rx="6" fill="#bfdbfe"/>
+
+  <rect x="284" y="382" width="32" height="24" rx="6" fill="#bfdbfe"/>
+  <rect x="328" y="382" width="32" height="24" rx="6" fill="#bfdbfe"/>
+  <rect x="372" y="382" width="32" height="24" rx="6" fill="#bfdbfe"/>
+
+  <rect x="284" y="416" width="32" height="24" rx="6" fill="#bfdbfe"/>
+  <rect x="328" y="416" width="32" height="24" rx="6" fill="#bfdbfe"/>
+  <rect x="372" y="416" width="32" height="24" rx="6" fill="#22c55e"/>
+</svg>

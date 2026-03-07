@@ -55,6 +55,12 @@
       "icon": "public/icon.ico",
       "artifactName": "MiniMarket-POS-Setup-${version}.${ext}"
     },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Office",
+      "icon": "public/icon.png",
+      "artifactName": "MiniMarket-POS-${version}.${ext}"
+    },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,

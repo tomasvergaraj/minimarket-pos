@@ -12,6 +12,14 @@ export default function UpdateBanner() {
   useEffect(() => {
     if (!window.electronAPI) return;
 
+    // Query current state immediately (handles race condition where
+    // events fired before this component mounted)
+    window.electronAPI.getUpdateState?.().then(({ state: s, progress: p }) => {
+      if (s === "downloading") { setState("downloading"); setProgress(p); }
+      else if (s === "ready")  { setState("ready"); setProgress(100); }
+    });
+
+    // Listen for future events
     window.electronAPI.onUpdateAvailable(() => {
       setState("downloading");
       setDismissed(false);

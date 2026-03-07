@@ -9,6 +9,10 @@ autoUpdater.logger.transports.file.level = "info";
 
 let mainWindow;
 
+// Persist update state so renderer can query it after mounting
+let updateState = "idle"; // "idle" | "downloading" | "ready"
+let updateProgress = 0;
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -65,24 +69,36 @@ app.on("activate", () => {
 
 // Auto-updater events
 autoUpdater.on("update-available", () => {
+  updateState = "downloading";
   mainWindow?.webContents.send("update-available");
 });
 
 autoUpdater.on("download-progress", (progress) => {
-  mainWindow?.webContents.send("download-progress", Math.round(progress.percent));
+  updateProgress = Math.round(progress.percent);
+  mainWindow?.webContents.send("download-progress", updateProgress);
 });
 
 autoUpdater.on("update-downloaded", () => {
+  updateState = "ready";
+  updateProgress = 100;
   mainWindow?.webContents.send("update-downloaded");
 });
 
 autoUpdater.on("error", (err) => {
+  // Silently ignore 404s (no GitHub Release published for this version yet)
+  if (err.message && (err.message.includes("404") || err.message.includes("latest.yml"))) {
+    log.info("Auto-updater: release not found on GitHub, skipping update check.");
+    return;
+  }
   mainWindow?.webContents.send("update-error", err.message);
 });
 
 ipcMain.on("install-update", () => {
   autoUpdater.quitAndInstall();
 });
+
+// Renderer queries current update state on mount (avoids race condition)
+ipcMain.handle("get-update-state", () => ({ state: updateState, progress: updateProgress }));
 
 // Fullscreen toggle via IPC
 ipcMain.handle("set-fullscreen", (_event, value) => {

@@ -10,6 +10,7 @@ interface ElectronAPI {
   getPrinters: () => Promise<PrinterInfo[]>;
   printReceipt: (data: { content: any[]; printerName?: string }) => Promise<{ success: boolean; error?: string }>;
   installUpdate: () => void;
+  getUpdateState: () => Promise<{ state: "idle" | "downloading" | "ready"; progress: number }>;
   onUpdateAvailable: (callback: () => void) => void;
   onDownloadProgress: (callback: (percent: number) => void) => void;
   onUpdateDownloaded: (callback: () => void) => void;

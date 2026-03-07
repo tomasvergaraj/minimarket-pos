@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getPrinters: () => ipcRenderer.invoke("get-printers"),
   printReceipt: (data) => ipcRenderer.invoke("print-receipt", data),
   installUpdate: () => ipcRenderer.send("install-update"),
+  getUpdateState: () => ipcRenderer.invoke("get-update-state"),
   onUpdateAvailable: (callback) =>
     ipcRenderer.on("update-available", callback),
   onDownloadProgress: (callback) =>

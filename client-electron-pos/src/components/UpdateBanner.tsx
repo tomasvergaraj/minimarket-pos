@@ -1,57 +1,98 @@
-import { useEffect, useState } from 'react'
-import { Download, RefreshCw } from 'lucide-react'
+import { useState, useEffect } from "react";
+import { Download, RefreshCw, X, AlertTriangle } from "lucide-react";
 
-type UpdateState = 'idle' | 'available' | 'downloaded' | 'error'
+type UpdateState = "idle" | "downloading" | "ready" | "error";
 
 export default function UpdateBanner() {
-  const [state, setState] = useState<UpdateState>('idle')
-  const [progress, setProgress] = useState(0)
-  const [errorMsg, setErrorMsg] = useState('')
+  const [state, setState] = useState<UpdateState>("idle");
+  const [progress, setProgress] = useState(0);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    if (!window.electronAPI) return
+    if (!window.electronAPI) return;
 
-    window.electronAPI.onUpdateAvailable(() => setState('available'))
-    window.electronAPI.onDownloadProgress((p) => setProgress(p))
-    window.electronAPI.onUpdateDownloaded(() => setState('downloaded'))
-    window.electronAPI.onUpdateError((msg) => { setState('error'); setErrorMsg(msg) })
-  }, [])
+    window.electronAPI.onUpdateAvailable(() => {
+      setState("downloading");
+      setDismissed(false);
+    });
 
-  if (state === 'idle') return null
+    window.electronAPI.onDownloadProgress((percent: number) => {
+      setState("downloading");
+      setProgress(percent);
+    });
 
-  return (
-    <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3 bg-gray-900 text-white text-sm px-4 py-3 rounded-lg shadow-lg max-w-xs w-72">
-      {state === 'available' && (
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1.5">
-            <Download className="w-4 h-4 shrink-0 text-blue-400" />
-            <span>Descargando actualización... {progress > 0 ? `${progress}%` : ''}</span>
-          </div>
-          {progress > 0 && (
-            <div className="w-full bg-gray-700 rounded-full h-1">
-              <div className="bg-blue-400 h-1 rounded-full transition-all" style={{ width: `${progress}%` }} />
-            </div>
-          )}
+    window.electronAPI.onUpdateDownloaded(() => {
+      setState("ready");
+      setProgress(100);
+      setDismissed(false);
+    });
+
+    window.electronAPI.onUpdateError((msg: string) => {
+      setState("error");
+      setErrorMsg(msg);
+    });
+  }, []);
+
+  if (state === "idle" || dismissed) return null;
+
+  if (state === "ready") {
+    return (
+      <div className="fixed bottom-0 inset-x-0 z-50 flex items-center justify-between gap-4 bg-green-600 text-white px-5 py-3 shadow-lg">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <RefreshCw size={16} />
+          Actualización lista — reinicia para aplicarla
         </div>
-      )}
-      {state === 'downloaded' && (
-        <>
-          <RefreshCw className="w-4 h-4 shrink-0 text-green-400" />
-          <div className="flex-1">
-            <p className="font-medium">Actualización lista</p>
-            <p className="text-gray-400 text-xs">Se instalará al reiniciar</p>
-          </div>
+        <div className="flex items-center gap-2">
           <button
             onClick={() => window.electronAPI?.installUpdate()}
-            className="bg-green-600 hover:bg-green-700 text-white text-xs font-medium px-3 py-1.5 rounded transition"
+            className="bg-white text-green-700 font-semibold text-sm px-4 py-1.5 rounded-lg hover:bg-green-50 transition"
           >
-            Reiniciar
+            Reiniciar ahora
           </button>
-        </>
-      )}
-      {state === 'error' && (
-        <span className="text-red-400 text-xs">Error al actualizar: {errorMsg}</span>
-      )}
-    </div>
-  )
+          <button onClick={() => setDismissed(true)} className="text-green-200 hover:text-white">
+            <X size={16} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (state === "downloading") {
+    return (
+      <div className="fixed bottom-0 inset-x-0 z-50 bg-blue-600 text-white px-5 py-2.5 shadow-lg">
+        <div className="flex items-center justify-between gap-4 mb-1">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Download size={15} className="animate-bounce" />
+            Descargando actualización{progress > 0 ? ` ${progress}%` : "..."}
+          </div>
+          <button onClick={() => setDismissed(true)} className="text-blue-300 hover:text-white">
+            <X size={15} />
+          </button>
+        </div>
+        <div className="w-full bg-blue-800 rounded-full h-1.5">
+          <div
+            className="bg-white h-1.5 rounded-full transition-all duration-300"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (state === "error") {
+    return (
+      <div className="fixed bottom-0 inset-x-0 z-50 flex items-center justify-between gap-4 bg-red-600 text-white px-5 py-3 shadow-lg">
+        <div className="flex items-center gap-2 text-sm">
+          <AlertTriangle size={15} />
+          Error al actualizar: {errorMsg}
+        </div>
+        <button onClick={() => setDismissed(true)} className="text-red-200 hover:text-white">
+          <X size={15} />
+        </button>
+      </div>
+    );
+  }
+
+  return null;
 }

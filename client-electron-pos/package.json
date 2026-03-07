@@ -72,7 +72,8 @@
     "publish": {
       "provider": "github",
       "owner": "tomasvergaraj",
-      "repo": "minimarket-pos"
+      "repo": "minimarket-pos",
+      "releaseType": "release"
     }
   }
 }

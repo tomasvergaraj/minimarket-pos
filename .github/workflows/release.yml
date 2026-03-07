@@ -4,13 +4,27 @@ on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  # 1. Crea el GitHub Release vacío primero
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --notes "Release ${{ github.ref_name }}" \
+            --repo "${{ github.repository }}"
+
+  # 2. Compila para cada plataforma y sube artefactos al release
   build:
+    needs: create-release
     name: Build (${{ matrix.label }})
     strategy:
       matrix:

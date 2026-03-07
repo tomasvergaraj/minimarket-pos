@@ -420,7 +420,14 @@ export default function POSPage() {
                           </button>
                         </div>
                         <div className="text-right">
-                          <p className="text-xs text-gray-500">{formatCLP(item.unit_price)} c/u</p>
+                          {item.product.is_on_offer && item.product.discount_price && (
+                            <p className="text-xs text-gray-400 line-through">
+                              {formatCLP(item.product.sell_price)} c/u
+                            </p>
+                          )}
+                          <p className={`text-xs font-semibold ${item.product.is_on_offer ? "text-red-500" : "text-gray-500"}`}>
+                            {formatCLP(item.unit_price)} c/u
+                          </p>
                           <p className="font-bold text-gray-800">{formatCLP(item.subtotal)}</p>
                         </div>
                       </div>

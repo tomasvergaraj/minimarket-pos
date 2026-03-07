@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   X, Search, Printer, RotateCcw, ClipboardList, FileText, CheckCircle,
-  XCircle, Clock
+  XCircle, Clock, AlertTriangle
 } from "lucide-react";
 import api from "@/services/api";
 import toast from "react-hot-toast";
@@ -105,6 +105,7 @@ export default function OrdersModal({ onClose, onLoadOrder }: Props) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("open");
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
 
   // Buscar tab
   const [searchType, setSearchType] = useState<"boleta" | "comanda">("boleta");
@@ -159,10 +160,10 @@ export default function OrdersModal({ onClose, onLoadOrder }: Props) {
   };
 
   const handleCancelOrder = async (order: Order) => {
-    if (!confirm(`¿Cancelar Comanda #${order.order_number}?`)) return;
     try {
       await api.post(`/orders/${order.id}/cancel`);
       toast.success("Comanda cancelada");
+      setConfirmCancelId(null);
       fetchOrders();
     } catch {
       toast.error("Error al cancelar");
@@ -261,38 +262,59 @@ export default function OrdersModal({ onClose, onLoadOrder }: Props) {
                       {order.sale_id && (
                         <div className="text-xs text-green-600 mb-2">Vinculada a venta</div>
                       )}
-                      <div className="flex gap-2">
-                        {order.status === "open" && (
-                          <>
-                            <button
-                              onClick={() => handleLoadOrder(order)}
-                              className="flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition"
-                            >
-                              <ClipboardList size={12} /> Cargar al carrito
-                            </button>
+                      {confirmCancelId === order.id ? (
+                        <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                          <AlertTriangle size={14} className="text-red-500 shrink-0" />
+                          <p className="text-xs text-red-700 font-semibold flex-1">
+                            ¿Cancelar Comanda #{order.order_number}?
+                          </p>
+                          <button
+                            onClick={() => handleCancelOrder(order)}
+                            className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg font-semibold transition"
+                          >
+                            Sí, cancelar
+                          </button>
+                          <button
+                            onClick={() => setConfirmCancelId(null)}
+                            className="text-xs bg-white hover:bg-gray-100 text-gray-600 border border-gray-300 px-3 py-1.5 rounded-lg font-medium transition"
+                          >
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          {order.status === "open" && (
+                            <>
+                              <button
+                                onClick={() => handleLoadOrder(order)}
+                                className="flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition"
+                              >
+                                <ClipboardList size={12} /> Cargar al carrito
+                              </button>
+                              <button
+                                onClick={() => printOrder(order)}
+                                className="flex items-center gap-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg transition"
+                              >
+                                <Printer size={12} /> Imprimir
+                              </button>
+                              <button
+                                onClick={() => setConfirmCancelId(order.id)}
+                                className="flex items-center gap-1 text-xs bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg transition"
+                              >
+                                <XCircle size={12} /> Cancelar
+                              </button>
+                            </>
+                          )}
+                          {order.status !== "open" && (
                             <button
                               onClick={() => printOrder(order)}
                               className="flex items-center gap-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg transition"
                             >
-                              <Printer size={12} /> Imprimir
+                              <Printer size={12} /> Reimprimir comanda
                             </button>
-                            <button
-                              onClick={() => handleCancelOrder(order)}
-                              className="flex items-center gap-1 text-xs bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg transition"
-                            >
-                              <XCircle size={12} /> Cancelar
-                            </button>
-                          </>
-                        )}
-                        {order.status !== "open" && (
-                          <button
-                            onClick={() => printOrder(order)}
-                            className="flex items-center gap-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg transition"
-                          >
-                            <Printer size={12} /> Reimprimir comanda
-                          </button>
-                        )}
-                      </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -9,20 +9,21 @@ permissions:
   contents: write
 
 jobs:
-  # 1. Crea el GitHub Release vacío primero
+  # 1. Crea el release como borrador
   create-release:
     runs-on: ubuntu-latest
     steps:
-      - name: Create GitHub Release
+      - name: Create draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "${{ github.ref_name }}" \
             --title "${{ github.ref_name }}" \
-            --notes "Release ${{ github.ref_name }}" \
-            --repo "${{ github.repository }}"
+            --notes "" \
+            --repo "${{ github.repository }}" \
+            --draft
 
-  # 2. Compila para cada plataforma y sube artefactos al release
+  # 2. Compila en cada plataforma y sube artefactos al borrador
   build:
     needs: create-release
     name: Build (${{ matrix.label }})
@@ -51,14 +52,63 @@ jobs:
         working-directory: client-electron-pos
         run: npm ci
 
-      - name: Generate PNG icon from SVG (Linux only)
+      - name: Generate PNG icon from SVG (Linux)
         if: runner.os == 'Linux'
         run: |
           convert -background none client-electron-pos/public/icon.svg \
             -resize 512x512 client-electron-pos/public/icon.png
 
-      - name: Build & publish
+      - name: Build (TypeScript + Vite)
         working-directory: client-electron-pos
+        run: npm run build
+
+      - name: Package with electron-builder
+        working-directory: client-electron-pos
+        run: npx electron-builder --publish never
+
+      - name: Upload Windows artifacts
+        if: runner.os == 'Windows'
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run electron:release
+        run: |
+          VERSION=$(node -p "require('./client-electron-pos/package.json').version")
+          gh release upload "${{ github.ref_name }}" \
+            "client-electron-pos/dist-electron/MiniMarket-POS-Setup-${VERSION}.exe" \
+            "client-electron-pos/dist-electron/MiniMarket-POS-Setup-${VERSION}.exe.blockmap" \
+            "client-electron-pos/dist-electron/latest.yml" \
+            --repo "${{ github.repository }}" \
+            --clobber
+
+      - name: Upload Linux artifacts
+        if: runner.os == 'Linux'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./client-electron-pos/package.json').version")
+          gh release upload "${{ github.ref_name }}" \
+            "client-electron-pos/dist-electron/MiniMarket-POS-${VERSION}.AppImage" \
+            "client-electron-pos/dist-electron/latest-linux.yml" \
+            --repo "${{ github.repository }}" \
+            --clobber
+          # deb es opcional, no falla si no existe
+          if [ -f "client-electron-pos/dist-electron/MiniMarket-POS-${VERSION}.deb" ]; then
+            gh release upload "${{ github.ref_name }}" \
+              "client-electron-pos/dist-electron/MiniMarket-POS-${VERSION}.deb" \
+              --repo "${{ github.repository }}" \
+              --clobber
+          fi
+
+  # 3. Publica el release sólo cuando ambas plataformas terminaron
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "${{ github.ref_name }}" \
+            --draft=false \
+            --latest \
+            --repo "${{ github.repository }}"

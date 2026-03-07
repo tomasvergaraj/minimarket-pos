@@ -20,7 +20,8 @@
       "Bash(grep -v \"^$\")",
       "Bash(git add admin-web/src/components/ui/Input.tsx admin-web/src/features/products/ProductFormModal.tsx admin-web/src/types/index.ts client-electron-pos/src/components/FavoritesPanel.tsx client-electron-pos/src/components/OrdersModal.tsx client-electron-pos/src/components/PaymentModal.tsx client-electron-pos/src/pages/POSPage.tsx client-electron-pos/src/stores/cartStore.ts client-electron-pos/src/stores/favoritesStore.ts client-electron-pos/src/types/index.ts server-fastapi/app/api/routes/orders.py server-fastapi/app/api/routes/products.py server-fastapi/app/api/routes/sales.py server-fastapi/app/models/__init__.py server-fastapi/app/models/order.py server-fastapi/app/models/product.py server-fastapi/app/models/sale.py server-fastapi/app/schemas/order.py server-fastapi/app/schemas/product.py server-fastapi/app/schemas/sale.py server-fastapi/app/services/sale_service.py server-fastapi/seed.py)",
       "Bash(git commit:*)",
-      "Bash(git push origin main)"
+      "Bash(git push origin main)",
+      "Bash(git add .github/workflows/release.yml client-electron-pos/public/icon.svg client-electron-pos/package.json)"
     ]
   }
 }

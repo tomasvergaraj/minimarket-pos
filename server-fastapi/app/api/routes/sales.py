@@ -28,6 +28,14 @@ def post_sale(
         raise HTTPException(400, str(e))
 
 
+@router.get("/number/{sale_number}", response_model=SaleOut)
+def get_sale_by_number(sale_number: int, db: Session = Depends(get_db)):
+    sale = db.query(Sale).filter(Sale.sale_number == sale_number).first()
+    if not sale:
+        raise HTTPException(404, "Sale not found")
+    return sale
+
+
 @router.get("/{sale_id}", response_model=SaleOut)
 def get_sale(sale_id: str, db: Session = Depends(get_db)):
     sale = db.query(Sale).filter(Sale.id == sale_id).first()

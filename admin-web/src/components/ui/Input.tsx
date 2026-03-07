@@ -31,6 +31,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             error
               ? 'border-danger text-danger'
               : 'border-border text-text-primary hover:border-border-strong',
+            props.disabled && 'opacity-50 cursor-not-allowed bg-gray-50',
             className
           )}
           {...props}

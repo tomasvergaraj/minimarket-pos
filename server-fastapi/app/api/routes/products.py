@@ -8,6 +8,24 @@ from app.schemas.product import ProductCreate, ProductUpdate, ProductOut
 router = APIRouter(prefix="/products", tags=["products"])
 
 
+def _effective_stock(product: Product, db: Session) -> int:
+    """For pack products, stock = floor(base_product.stock / units_contained)."""
+    if product.is_pack and product.base_product_id:
+        base = db.query(Product).filter(Product.id == product.base_product_id).first()
+        if base:
+            return int(base.stock) // max(int(product.units_contained), 1)
+        return 0
+    return int(product.stock)
+
+
+def _to_out(product: Product, db: Session) -> ProductOut:
+    out = ProductOut.model_validate(product)
+    effective = _effective_stock(product, db)
+    if effective != out.stock:
+        out = out.model_copy(update={"stock": effective})
+    return out
+
+
 @router.get("/", response_model=list[ProductOut])
 def list_products(
     search: str | None = None,
@@ -28,7 +46,8 @@ def list_products(
         )
     if category:
         q = q.filter(Product.category == category)
-    return q.order_by(Product.name).offset(skip).limit(limit).all()
+    products = q.order_by(Product.name).offset(skip).limit(limit).all()
+    return [_to_out(p, db) for p in products]
 
 
 @router.get("/barcode/{barcode}", response_model=ProductOut)
@@ -36,7 +55,7 @@ def get_by_barcode(barcode: str, db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.barcode == barcode, Product.is_active == True).first()
     if not product:
         raise HTTPException(404, "Product not found")
-    return product
+    return _to_out(product, db)
 
 
 @router.get("/{product_id}", response_model=ProductOut)
@@ -44,16 +63,19 @@ def get_product(product_id: str, db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(404, "Product not found")
-    return product
+    return _to_out(product, db)
 
 
 @router.post("/", response_model=ProductOut, status_code=201)
 def create_product(data: ProductCreate, db: Session = Depends(get_db)):
-    product = Product(**data.model_dump())
+    dump = data.model_dump()
+    if dump.get("is_pack"):
+        dump["stock"] = 0  # pack products don't own stock
+    product = Product(**dump)
     db.add(product)
     db.commit()
     db.refresh(product)
-    return product
+    return _to_out(product, db)
 
 
 @router.put("/{product_id}", response_model=ProductOut)
@@ -65,7 +87,7 @@ def update_product(product_id: str, data: ProductUpdate, db: Session = Depends(g
         setattr(product, key, value)
     db.commit()
     db.refresh(product)
-    return product
+    return _to_out(product, db)
 
 
 @router.delete("/{product_id}")

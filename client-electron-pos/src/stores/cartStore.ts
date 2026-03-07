@@ -1,13 +1,21 @@
 import { create } from "zustand";
 import type { Product, CartItem } from "@/types";
 
+/** Effective sell price: uses discount_price if the offer is active */
+function effectivePrice(product: Product): number {
+  if (product.is_on_offer && product.discount_price && product.discount_price > 0) {
+    return product.discount_price;
+  }
+  return product.sell_price;
+}
+
 interface CartState {
   items: CartItem[];
-  /** Retorna true si se agregó, false si el stock no alcanza */
+  /** Add product to cart. Returns true if added, false if stock is insufficient. */
   addItem: (product: Product, qty?: number) => boolean;
-  removeItem: (productId: string) => void;
-  /** Retorna true si se actualizó, false si se intentó superar el stock */
-  updateQuantity: (productId: string, qty: number) => boolean;
+  removeItem: (cartKey: string) => void;
+  /** Returns true if updated, false if quantity would exceed stock. */
+  updateQuantity: (cartKey: string, qty: number) => boolean;
   clear: () => void;
   total: () => number;
   itemCount: () => number;
@@ -17,45 +25,60 @@ export const useCartStore = create<CartState>((set, get) => ({
   items: [],
 
   addItem: (product, qty = 1) => {
+    const cartKey = product.id;
+    const unitPrice = effectivePrice(product);
     const items = get().items;
-    const existing = items.find((i) => i.product.id === product.id);
-    const currentQty = existing ? existing.quantity : 0;
-    const newQty = currentQty + qty;
 
-    if (newQty > product.stock) return false;
+    const reserved = items
+      .filter((i) => i.product.id === product.id)
+      .reduce((sum, i) => sum + i.quantity, 0);
 
+    if (reserved + qty > product.stock) return false;
+
+    const existing = items.find((i) => i.cartKey === cartKey);
     if (existing) {
+      const newQty = existing.quantity + qty;
       set({
         items: items.map((i) =>
-          i.product.id === product.id
-            ? { ...i, quantity: newQty, subtotal: newQty * product.sell_price }
+          i.cartKey === cartKey
+            ? { ...i, quantity: newQty, subtotal: newQty * unitPrice }
             : i
         ),
       });
     } else {
       set({
-        items: [...items, { product, quantity: qty, subtotal: qty * product.sell_price }],
+        items: [
+          ...items,
+          { cartKey, product, quantity: qty, subtotal: qty * unitPrice, unit_price: unitPrice },
+        ],
       });
     }
     return true;
   },
 
-  removeItem: (productId) => {
-    set({ items: get().items.filter((i) => i.product.id !== productId) });
+  removeItem: (cartKey) => {
+    set({ items: get().items.filter((i) => i.cartKey !== cartKey) });
   },
 
-  updateQuantity: (productId, qty) => {
+  updateQuantity: (cartKey, qty) => {
     if (qty <= 0) {
-      get().removeItem(productId);
+      get().removeItem(cartKey);
       return true;
     }
-    const item = get().items.find((i) => i.product.id === productId);
-    if (item && qty > item.product.stock) return false;
+    const items = get().items;
+    const item = items.find((i) => i.cartKey === cartKey);
+    if (!item) return false;
+
+    const otherReserved = items
+      .filter((i) => i.product.id === item.product.id && i.cartKey !== cartKey)
+      .reduce((sum, i) => sum + i.quantity, 0);
+
+    if (otherReserved + qty > item.product.stock) return false;
 
     set({
-      items: get().items.map((i) =>
-        i.product.id === productId
-          ? { ...i, quantity: qty, subtotal: qty * i.product.sell_price }
+      items: items.map((i) =>
+        i.cartKey === cartKey
+          ? { ...i, quantity: qty, subtotal: qty * i.unit_price }
           : i
       ),
     });

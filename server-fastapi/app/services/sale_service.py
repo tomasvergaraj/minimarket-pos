@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -5,6 +7,7 @@ from app.models.product import Product
 from app.models.sale import Sale, SaleItem, PaymentMethod, SaleStatus
 from app.models.cash_register import CashSession
 from app.models.kardex import KardexEntry, MovementType
+from app.models.order import Order, OrderStatus
 from app.schemas.sale import SaleCreate
 from app.tax.sii.service import emit_boleta
 
@@ -24,10 +27,35 @@ def create_sale(db: Session, data: SaleCreate) -> tuple[Sale, bytes | None]:
         product = db.query(Product).filter(Product.id == item_data.product_id).with_for_update().first()
         if not product:
             raise ValueError(f"Product {item_data.product_id} not found")
-        if product.stock < item_data.quantity:
-            raise ValueError(f"Insufficient stock for {product.name}: {product.stock} available")
 
-        line_subtotal = float(product.sell_price) * item_data.quantity
+        # Determine which product owns the stock
+        units_to_deduct = item_data.quantity
+        if product.is_pack and product.base_product_id:
+            stock_product = db.query(Product).filter(
+                Product.id == product.base_product_id
+            ).with_for_update().first()
+            if not stock_product:
+                raise ValueError(f"Producto base no encontrado para {product.name}")
+            units_to_deduct = item_data.quantity * max(int(product.units_contained), 1)
+        else:
+            stock_product = product
+
+        if stock_product.stock < units_to_deduct:
+            raise ValueError(
+                f"Stock insuficiente para {product.name}: "
+                f"{stock_product.stock // max(int(product.units_contained), 1)} disponibles"
+            )
+
+        # Effective unit price: override → active discount → regular price
+        if item_data.unit_price_override is not None:
+            unit_price = float(item_data.unit_price_override)
+        elif (product.discount_price and float(product.discount_price) > 0 and
+              (product.discount_ends_at is None or product.discount_ends_at > datetime.utcnow())):
+            unit_price = float(product.discount_price)
+        else:
+            unit_price = float(product.sell_price)
+
+        line_subtotal = unit_price * item_data.quantity
         line_tax = round(line_subtotal * float(product.tax_rate) / (100 + float(product.tax_rate)), 2)
 
         sale_item = SaleItem(
@@ -35,26 +63,25 @@ def create_sale(db: Session, data: SaleCreate) -> tuple[Sale, bytes | None]:
             product_name=product.name,
             product_sku=product.sku,
             quantity=item_data.quantity,
-            unit_price=float(product.sell_price),
+            unit_price=unit_price,
             subtotal=line_subtotal,
             tax_rate=float(product.tax_rate),
             tax_amount=line_tax,
+            units_per_item=int(product.units_contained) if product.is_pack else 1,
         )
         sale_items.append(sale_item)
         subtotal += line_subtotal
         tax_total += line_tax
 
-        # Update stock
-        stock_before = product.stock
-        product.stock -= item_data.quantity
+        stock_before = stock_product.stock
+        stock_product.stock -= units_to_deduct
 
-        # Kardex entry
         kardex = KardexEntry(
-            product_id=product.id,
+            product_id=stock_product.id,
             movement_type=MovementType.SALE,
-            quantity=-item_data.quantity,
+            quantity=-units_to_deduct,
             stock_before=stock_before,
-            stock_after=product.stock,
+            stock_after=stock_product.stock,
             user_id=data.seller_id,
         )
         db.add(kardex)
@@ -95,6 +122,15 @@ def create_sale(db: Session, data: SaleCreate) -> tuple[Sale, bytes | None]:
     db.commit()
     db.refresh(sale)
 
+    # Link and close any orders (comandas) associated with this sale
+    if data.order_ids:
+        for oid in data.order_ids:
+            order = db.query(Order).filter(Order.id == oid).first()
+            if order and order.status == OrderStatus.OPEN:
+                order.status = OrderStatus.CLOSED
+                order.sale_id = sale.id
+        db.commit()
+
     # Emisión DTE (después del commit; sii_status queda en PENDING si OK)
     dte_bytes = emit_boleta(db, sale)
     db.refresh(sale)  # recargar sii_folio/sii_status desde DB tras el commit de emit_boleta
@@ -112,14 +148,21 @@ def void_sale(db: Session, sale_id: str) -> Sale:
     for item in sale.items:
         product = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
         if product:
-            stock_before = product.stock
-            product.stock += item.quantity
+            units_restored = item.quantity * (item.units_per_item or 1)
+            # Restore to the correct stock owner (base product for packs)
+            stock_product = product
+            if product.is_pack and product.base_product_id:
+                bp = db.query(Product).filter(Product.id == product.base_product_id).with_for_update().first()
+                if bp:
+                    stock_product = bp
+            stock_before = stock_product.stock
+            stock_product.stock += units_restored
             kardex = KardexEntry(
-                product_id=product.id,
+                product_id=stock_product.id,
                 movement_type=MovementType.ADJUSTMENT,
-                quantity=item.quantity,
+                quantity=units_restored,
                 stock_before=stock_before,
-                stock_after=product.stock,
+                stock_after=stock_product.stock,
                 reference_id=sale_id,
                 notes="Sale voided",
             )

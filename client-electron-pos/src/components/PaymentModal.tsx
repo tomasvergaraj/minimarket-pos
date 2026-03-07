@@ -11,9 +11,11 @@ interface Props {
   total: number;
   onComplete: (sale: Sale) => void;
   onClose: () => void;
+  /** IDs of open orders (comandas) to link/close with this sale */
+  orderIds?: string[];
 }
 
-export default function PaymentModal({ total, onComplete, onClose }: Props) {
+export default function PaymentModal({ total, onComplete, onClose, orderIds }: Props) {
   const { session, register, user } = useAuthStore();
   const items = useCartStore((s) => s.items);
   const [method, setMethod] = useState<"cash" | "card" | "mixed">("cash");
@@ -45,7 +47,9 @@ export default function PaymentModal({ total, onComplete, onClose }: Props) {
         items: items.map((i) => ({
           product_id: i.product.id,
           quantity: i.quantity,
+          unit_price_override: i.unit_price,
         })),
+        ...(orderIds && orderIds.length > 0 ? { order_ids: orderIds } : {}),
       });
       onComplete(data);
     } catch (err: any) {

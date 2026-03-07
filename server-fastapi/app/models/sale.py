@@ -64,5 +64,7 @@ class SaleItem(Base):
     subtotal: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     tax_rate: Mapped[float] = mapped_column(Numeric(5, 2), default=19.0)
     tax_amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    # How many stock units each sold "item" represents (1 for unit, pack_size for pack)
+    units_per_item: Mapped[int] = mapped_column(Integer, default=1)
 
     sale: Mapped["Sale"] = relationship("Sale", back_populates="items")

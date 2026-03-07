@@ -7,6 +7,7 @@ from app.schemas.common import ApiError, PaginationMeta
 class SaleItemCreate(BaseModel):
     product_id: str
     quantity: int
+    unit_price_override: float | None = None  # override price (e.g. manual discount)
 
 
 class SaleCreate(BaseModel):
@@ -17,6 +18,8 @@ class SaleCreate(BaseModel):
     cash_amount: float = 0
     card_amount: float = 0
     items: list[SaleItemCreate]
+    # Optional: IDs of open orders (comandas) to link/close with this sale
+    order_ids: list[str] | None = None
 
 
 class SaleItemOut(BaseModel):
@@ -29,6 +32,7 @@ class SaleItemOut(BaseModel):
     subtotal: float
     tax_rate: float
     tax_amount: float
+    units_per_item: int = 1
 
     model_config = {"from_attributes": True}
 

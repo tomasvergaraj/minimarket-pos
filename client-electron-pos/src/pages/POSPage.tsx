@@ -4,12 +4,19 @@ import { useCartStore } from "@/stores/cartStore";
 import { formatCLP } from "@/utils/format";
 import api from "@/services/api";
 import toast from "react-hot-toast";
-import type { Product, Sale } from "@/types";
+import type { Product, Sale, Order, CartItem } from "@/types";
 import PaymentModal from "@/components/PaymentModal";
 import CloseSessionModal from "@/components/CloseSessionModal";
 import ReceiptPreviewModal from "@/components/ReceiptPreviewModal";
-import { Search, Trash2, Plus, Minus, LogOut, X, Settings, AlertTriangle } from "lucide-react";
+import FavoritesPanel from "@/components/FavoritesPanel";
+import OrdersModal from "@/components/OrdersModal";
+import {
+  Search, Trash2, Plus, Minus, LogOut, X, Settings,
+  AlertTriangle, ClipboardList, Save, Printer
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { buildOrderContent } from "@/services/printer";
+import { getSavedPrinterName } from "@/pages/SettingsPage";
 
 /** Devuelve clase de color según stock disponible vs mínimo */
 function stockColor(stock: number, minStock: number) {
@@ -20,7 +27,7 @@ function stockColor(stock: number, minStock: number) {
 
 /** Badge de stock para el carrito: muestra unidades restantes tras restar lo del carrito */
 function StockBadge({ remaining, minStock }: { remaining: number; minStock: number }) {
-  if (remaining > minStock) return null; // suficiente stock, no molesta
+  if (remaining > minStock) return null;
   if (remaining <= 0) {
     return (
       <span className="flex items-center gap-1 text-xs text-red-600 font-semibold">
@@ -42,31 +49,33 @@ export default function POSPage() {
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [showPayment, setShowPayment] = useState(false);
   const [showCloseSession, setShowCloseSession] = useState(false);
+  const [showOrders, setShowOrders] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+
+  // Comanda (order) tracking
+  const [activeOrder, setActiveOrder] = useState<Order | null>(null);
+  const [showOrderRef, setShowOrderRef] = useState(false);
+  const [orderRef, setOrderRef] = useState("");
+  const [savingOrder, setSavingOrder] = useState(false);
 
   const tryAddItem = useCallback((product: Product) => {
     if (product.stock <= 0) {
       toast.error(`${product.name}: sin stock`);
       return;
     }
-    const ok = addItem(product);
+    const ok = addItem(product, 1);
     if (!ok) {
-      const inCart = items.find((i) => i.product.id === product.id)?.quantity ?? 0;
-      toast.error(`Stock insuficiente — máx. ${product.stock} (${inCart} en carrito)`);
+      toast.error(`Stock insuficiente — disponibles: ${product.stock}`);
     } else {
       toast.success(`${product.name} agregado`);
     }
-  }, [addItem, items]);
+  }, [addItem]);
 
-  // Barcode scanner: auto-search on input
   const handleSearch = useCallback(async (query: string) => {
     const trimmed = query.trim();
-    if (!trimmed) {
-      setSearchResults([]);
-      return;
-    }
+    if (!trimmed) { setSearchResults([]); return; }
     try {
       if (/^\d+$/.test(trimmed)) {
         try {
@@ -75,9 +84,7 @@ export default function POSPage() {
           setSearchQuery("");
           setSearchResults([]);
           return;
-        } catch {
-          // Not a valid barcode, fall through to name search
-        }
+        } catch { /* not a barcode */ }
       }
       const { data } = await api.get("/products/", { params: { search: trimmed } });
       setSearchResults(data);
@@ -86,48 +93,109 @@ export default function POSPage() {
     }
   }, [tryAddItem]);
 
-  // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (searchQuery.length >= 2) {
-        handleSearch(searchQuery);
-      } else {
-        setSearchResults([]);
-      }
+      if (searchQuery.length >= 2) handleSearch(searchQuery);
+      else setSearchResults([]);
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery, handleSearch]);
 
-  // Keyboard shortcut: focus search on F2
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "F2") {
-        e.preventDefault();
-        searchRef.current?.focus();
-      }
-      if (e.key === "F4") {
-        e.preventDefault();
-        if (items.length > 0) setShowPayment(true);
-      }
+      if (e.key === "F2") { e.preventDefault(); searchRef.current?.focus(); }
+      if (e.key === "F4") { e.preventDefault(); if (items.length > 0) setShowPayment(true); }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [items]);
 
   const handleSearchKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleSearch(searchQuery);
-    }
+    if (e.key === "Enter") { e.preventDefault(); handleSearch(searchQuery); }
   };
 
   const handlePaymentComplete = (sale: Sale) => {
     setLastSale(sale);
     clear();
+    setActiveOrder(null);
+    setOrderRef("");
     setShowPayment(false);
     toast.success(`Venta #${sale.sale_number} completada`);
     searchRef.current?.focus();
   };
+
+  // Load a comanda into the cart
+  const handleLoadOrder = (order: Order, cartItems: CartItem[]) => {
+    clear();
+    cartItems.forEach((ci) => addItem(ci.product, ci.quantity));
+    setActiveOrder(order);
+    setOrderRef(order.reference ?? "");
+  };
+
+  // Save (create or update) the current cart as a comanda
+  const handleSaveOrder = async () => {
+    if (items.length === 0) { toast.error("El carrito está vacío"); return; }
+    if (!register) { toast.error("Sin caja seleccionada"); return; }
+    setSavingOrder(true);
+    try {
+      const payload = {
+        register_id: register.id,
+        seller_id: user?.id ?? null,
+        reference: orderRef.trim() || null,
+        items: items.map((i) => ({ product_id: i.product.id, quantity: i.quantity })),
+      };
+
+      let savedOrder: Order;
+      if (activeOrder) {
+        // Update existing open order
+        const { data } = await api.patch<Order>(`/orders/${activeOrder.id}`, {
+          items: payload.items,
+          reference: payload.reference,
+        });
+        savedOrder = data;
+        toast.success(`Comanda #${savedOrder.order_number} actualizada`);
+      } else {
+        // Create new order
+        const { data } = await api.post<Order>("/orders/", payload);
+        savedOrder = data;
+        toast.success(`Comanda #${savedOrder.order_number} guardada`);
+      }
+      setActiveOrder(savedOrder);
+      setShowOrderRef(false);
+
+      // Auto-print if printer is configured
+      if (window.electronAPI) {
+        const printerName = getSavedPrinterName();
+        if (printerName) {
+          const content = buildOrderContent(savedOrder);
+          await window.electronAPI.printReceipt({ content, printerName });
+        }
+      }
+    } catch {
+      toast.error("Error guardando comanda");
+    } finally {
+      setSavingOrder(false);
+    }
+  };
+
+  const handleReprintOrder = async () => {
+    if (!activeOrder) return;
+    if (!window.electronAPI) { toast.error("Impresión solo disponible en app de escritorio"); return; }
+    const printerName = getSavedPrinterName();
+    if (!printerName) { toast.error("Configura una impresora en Configuración"); return; }
+    const content = buildOrderContent(activeOrder);
+    const result = await window.electronAPI.printReceipt({ content, printerName });
+    if (result.success) toast.success("Comanda impresa");
+    else toast.error(`Error: ${result.error}`);
+  };
+
+  const handleClearActiveOrder = () => {
+    setActiveOrder(null);
+    setOrderRef("");
+    clear();
+  };
+
+  const showFavorites = searchResults.length === 0;
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">
@@ -141,6 +209,12 @@ export default function POSPage() {
           <span className="text-sm text-gray-500">{user?.full_name}</span>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowOrders(true)}
+            className="flex items-center gap-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg transition"
+          >
+            <ClipboardList size={16} /> Comandas
+          </button>
           <button onClick={() => navigate("/settings")} className="p-2 text-gray-400 hover:text-gray-600">
             <Settings size={20} />
           </button>
@@ -148,17 +222,16 @@ export default function POSPage() {
             onClick={() => setShowCloseSession(true)}
             className="flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2 rounded-lg text-sm font-medium transition"
           >
-            <LogOut size={16} />
-            Cerrar Caja
+            <LogOut size={16} /> Cerrar Caja
           </button>
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left: Search + Products */}
-        <div className="flex-1 flex flex-col p-4 overflow-hidden">
+        {/* Left: Search + Favorites */}
+        <div className="flex-1 flex flex-col p-4 overflow-y-auto">
           {/* Search bar */}
-          <div className="relative mb-4">
+          <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
             <input
               ref={searchRef}
@@ -182,49 +255,114 @@ export default function POSPage() {
 
           {/* Search results */}
           {searchResults.length > 0 && (
-            <div className="bg-white rounded-xl border shadow-sm mb-4 max-h-64 overflow-y-auto">
+            <div className="bg-white rounded-xl border shadow-sm mb-4 max-h-72 overflow-y-auto">
               {searchResults.map((product) => {
-                const inCart = items.find((i) => i.product.id === product.id)?.quantity ?? 0;
-                const remaining = product.stock - inCart;
+                const reserved = items
+                  .filter((i) => i.product.id === product.id)
+                  .reduce((sum, i) => sum + i.quantity, 0);
+                const remaining = product.stock - reserved;
                 const outOfStock = remaining <= 0;
+                const displayPrice = product.is_on_offer && product.discount_price
+                  ? product.discount_price
+                  : product.sell_price;
                 return (
-                  <button
-                    key={product.id}
-                    onClick={() => {
-                      tryAddItem(product);
-                      setSearchQuery("");
-                      setSearchResults([]);
-                      searchRef.current?.focus();
-                    }}
-                    disabled={outOfStock}
-                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed border-b last:border-0 transition"
-                  >
-                    <div className="text-left">
-                      <p className="font-medium text-gray-800">{product.name}</p>
-                      <p className="text-sm text-gray-500">
-                        {product.sku} {product.barcode && `| ${product.barcode}`}
-                        {" | "}
-                        <span className={stockColor(remaining, product.min_stock)}>
-                          Stock: {product.stock}
-                          {inCart > 0 && ` (${inCart} en carrito)`}
-                        </span>
-                      </p>
+                  <div key={product.id} className="border-b last:border-0">
+                    <div className="flex items-center justify-between px-4 py-2.5">
+                      <div className="text-left flex-1 min-w-0 pr-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-medium text-gray-800 text-sm">{product.name}</p>
+                          {product.is_pack && (
+                            <span className="text-xs font-bold text-white bg-purple-600 px-1.5 py-0.5 rounded">
+                              Pack x{product.units_contained}
+                            </span>
+                          )}
+                          {product.is_on_offer && (
+                            <span className="text-xs font-bold text-white bg-red-500 px-1.5 py-0.5 rounded">
+                              OFERTA
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          {product.sku}
+                          {" | "}
+                          <span className={stockColor(remaining, product.min_stock)}>
+                            Stock: {product.stock}{reserved > 0 && ` (${reserved} reservados)`}
+                          </span>
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {product.is_on_offer && product.discount_price ? (
+                          <div className="text-right">
+                            <p className="text-xs text-gray-400 line-through">{formatCLP(product.sell_price)}</p>
+                            <p className="font-bold text-red-600 text-base">{formatCLP(product.discount_price)}</p>
+                          </div>
+                        ) : (
+                          <span className="font-bold text-blue-600 text-base">{formatCLP(displayPrice)}</span>
+                        )}
+                        <button
+                          onClick={() => {
+                            tryAddItem(product);
+                            setSearchQuery(""); setSearchResults([]);
+                            searchRef.current?.focus();
+                          }}
+                          disabled={outOfStock}
+                          className="text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white px-2.5 py-1 rounded-lg transition"
+                        >
+                          + Agregar
+                        </button>
+                      </div>
                     </div>
-                    <span className="font-bold text-blue-600 text-lg">{formatCLP(product.sell_price)}</span>
-                  </button>
+                  </div>
                 );
               })}
             </div>
+          )}
+
+          {/* Favorites panel — visible when no search results */}
+          {showFavorites && (
+            <FavoritesPanel onProductClick={tryAddItem} />
           )}
         </div>
 
         {/* Right: Cart */}
         <div className="w-[420px] bg-white border-l flex flex-col">
+          {/* Active order banner */}
+          {activeOrder && (
+            <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-blue-700">
+                <ClipboardList size={14} />
+                <span className="font-semibold">Comanda #{activeOrder.order_number}</span>
+                {activeOrder.reference && (
+                  <span className="bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full text-xs">
+                    {activeOrder.reference}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={handleReprintOrder}
+                  className="text-blue-500 hover:text-blue-700 p-1"
+                  title="Reimprimir comanda"
+                >
+                  <Printer size={14} />
+                </button>
+                <button
+                  onClick={handleClearActiveOrder}
+                  className="text-blue-400 hover:text-blue-600 p-1"
+                  title="Descartar comanda"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="p-4 border-b">
             <div className="flex items-center justify-between">
               <h2 className="font-bold text-gray-800 text-lg">Carrito</h2>
               {items.length > 0 && (
-                <button onClick={clear} className="text-red-500 hover:text-red-600 text-sm flex items-center gap-1">
+                <button onClick={() => { clear(); setActiveOrder(null); }}
+                  className="text-red-500 hover:text-red-600 text-sm flex items-center gap-1">
                   <Trash2 size={14} /> Limpiar
                 </button>
               )}
@@ -240,20 +378,31 @@ export default function POSPage() {
             ) : (
               <div className="divide-y">
                 {items.map((item) => {
-                  const remaining = item.product.stock - item.quantity;
-                  const atLimit = item.quantity >= item.product.stock;
+                  const reservedForOthers = items
+                    .filter((i) => i.product.id === item.product.id && i.cartKey !== item.cartKey)
+                    .reduce((sum, i) => sum + i.quantity, 0);
+                  const remaining = item.product.stock - reservedForOthers - item.quantity;
+                  const atLimit = item.quantity + 1 > item.product.stock - reservedForOthers;
                   return (
-                    <div key={item.product.id} className="p-3 hover:bg-gray-50">
+                    <div key={item.cartKey} className="p-3 hover:bg-gray-50">
                       <div className="flex justify-between items-start mb-1">
-                        <p className="font-medium text-gray-800 text-sm flex-1 pr-2">{item.product.name}</p>
-                        <button onClick={() => removeItem(item.product.id)} className="text-red-400 hover:text-red-600 shrink-0">
+                        <div className="flex-1 pr-2">
+                          <p className="font-medium text-gray-800 text-sm">{item.product.name}</p>
+                          {item.product.is_pack && (
+                            <span className="text-xs text-purple-600 font-semibold">Pack x{item.product.units_contained}</span>
+                          )}
+                          {item.product.is_on_offer && (
+                            <span className="text-xs text-red-600 font-semibold ml-1">OFERTA</span>
+                          )}
+                        </div>
+                        <button onClick={() => removeItem(item.cartKey)} className="text-red-400 hover:text-red-600 shrink-0">
                           <X size={16} />
                         </button>
                       </div>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                            onClick={() => updateQuantity(item.cartKey, item.quantity - 1)}
                             className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg"
                           >
                             <Minus size={14} />
@@ -261,8 +410,8 @@ export default function POSPage() {
                           <span className="w-10 text-center font-mono font-bold">{item.quantity}</span>
                           <button
                             onClick={() => {
-                              const ok = updateQuantity(item.product.id, item.quantity + 1);
-                              if (!ok) toast.error(`Stock máximo: ${item.product.stock}`);
+                              const ok = updateQuantity(item.cartKey, item.quantity + 1);
+                              if (!ok) toast.error(`Stock insuficiente`);
                             }}
                             disabled={atLimit}
                             className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg"
@@ -271,11 +420,10 @@ export default function POSPage() {
                           </button>
                         </div>
                         <div className="text-right">
-                          <p className="text-xs text-gray-500">{formatCLP(item.product.sell_price)} c/u</p>
+                          <p className="text-xs text-gray-500">{formatCLP(item.unit_price)} c/u</p>
                           <p className="font-bold text-gray-800">{formatCLP(item.subtotal)}</p>
                         </div>
                       </div>
-                      {/* Stock indicator */}
                       <div className="mt-1">
                         <StockBadge remaining={remaining} minStock={item.product.min_stock} />
                       </div>
@@ -292,6 +440,43 @@ export default function POSPage() {
               <span className="text-gray-600">Total</span>
               <span className="text-3xl font-bold text-gray-800">{formatCLP(total())}</span>
             </div>
+
+            {/* Save as comanda */}
+            {showOrderRef ? (
+              <div className="flex gap-2">
+                <input
+                  value={orderRef}
+                  onChange={(e) => setOrderRef(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleSaveOrder(); if (e.key === "Escape") setShowOrderRef(false); }}
+                  placeholder='Referencia opcional (ej: "Mesa 3")'
+                  className="flex-1 border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500"
+                  autoFocus
+                />
+                <button
+                  onClick={handleSaveOrder}
+                  disabled={savingOrder || items.length === 0}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition"
+                >
+                  {savingOrder ? "..." : "OK"}
+                </button>
+                <button onClick={() => setShowOrderRef(false)} className="text-gray-400 hover:text-gray-600 px-2">
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  if (items.length === 0) return;
+                  setShowOrderRef(true);
+                }}
+                disabled={items.length === 0}
+                className="w-full flex items-center justify-center gap-2 border-2 border-blue-300 hover:border-blue-500 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed text-blue-700 py-2 rounded-xl text-sm font-medium transition"
+              >
+                <Save size={15} />
+                {activeOrder ? `Actualizar Comanda #${activeOrder.order_number}` : "Guardar como Comanda"}
+              </button>
+            )}
+
             <button
               onClick={() => setShowPayment(true)}
               disabled={items.length === 0}
@@ -307,6 +492,7 @@ export default function POSPage() {
       {showPayment && (
         <PaymentModal
           total={total()}
+          orderIds={activeOrder ? [activeOrder.id] : undefined}
           onComplete={handlePaymentComplete}
           onClose={() => setShowPayment(false)}
         />
@@ -322,6 +508,13 @@ export default function POSPage() {
           sellerName={user?.full_name}
           registerName={register?.name}
           onClose={() => setLastSale(null)}
+        />
+      )}
+
+      {showOrders && (
+        <OrdersModal
+          onClose={() => setShowOrders(false)}
+          onLoadOrder={handleLoadOrder}
         />
       )}
     </div>

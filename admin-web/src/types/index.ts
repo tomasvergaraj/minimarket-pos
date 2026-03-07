@@ -65,6 +65,14 @@ export interface Product {
   stock: number
   min_stock: number
   is_active: boolean
+  // Pack / presentación
+  is_pack: boolean
+  units_contained: number
+  base_product_id: string | null
+  // Oferta
+  discount_price: number | null
+  discount_ends_at: string | null
+  is_on_offer: boolean
   created_at: string
   updated_at: string
 }
@@ -81,6 +89,11 @@ export interface ProductCreate {
   tax_rate?: number
   stock?: number
   min_stock?: number
+  is_pack?: boolean
+  units_contained?: number
+  base_product_id?: string | null
+  discount_price?: number | null
+  discount_ends_at?: string | null
 }
 
 export interface ProductUpdate {
@@ -94,6 +107,11 @@ export interface ProductUpdate {
   sell_price?: number
   tax_rate?: number
   min_stock?: number
+  is_pack?: boolean
+  units_contained?: number
+  base_product_id?: string | null
+  discount_price?: number | null
+  discount_ends_at?: string | null
 }
 
 export interface SaleItem {

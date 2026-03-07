@@ -12,14 +12,24 @@ export interface Product {
   stock: number;
   min_stock: number;
   is_active: boolean;
+  // Pack / presentación (stock viene de base_product, ya computado por API)
+  is_pack: boolean;
+  units_contained: number;
+  base_product_id: string | null;
+  // Oferta
+  discount_price: number | null;
+  discount_ends_at: string | null;
+  is_on_offer: boolean;
   created_at: string;
   updated_at: string;
 }
 
 export interface CartItem {
+  cartKey: string;        // product.id
   product: Product;
   quantity: number;
   subtotal: number;
+  unit_price: number;     // effective price per item (sell or discount)
 }
 
 export interface SaleItem {
@@ -32,6 +42,7 @@ export interface SaleItem {
   subtotal: number;
   tax_rate: number;
   tax_amount: number;
+  units_per_item: number;
 }
 
 export interface Sale {
@@ -88,4 +99,35 @@ export interface User {
   role: string;
   is_active: boolean;
   created_at: string;
+}
+
+export interface OrderItem {
+  id: string;
+  product_id: string;
+  product_name: string;
+  product_sku: string;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+}
+
+export interface Order {
+  id: string;
+  order_number: number;
+  register_id: string;
+  seller_id: string | null;
+  status: "open" | "closed" | "cancelled";
+  reference: string | null;
+  notes: string | null;
+  sale_id: string | null;
+  created_at: string;
+  updated_at: string;
+  items: OrderItem[];
+}
+
+export interface FavoriteSlot {
+  slot: number;
+  product_id: string;
+  product_name: string;
+  sell_price: number;
 }

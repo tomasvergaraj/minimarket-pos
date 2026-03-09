@@ -361,13 +361,19 @@ function Invoke-Bootstrap {
         "--database-url", $DatabaseUrl,
         "--server-port", "$ServerPort",
         "--store-name", $StoreName,
-        "--store-rut", $StoreRut,
-        "--store-address", $StoreAddress,
         "--admin-pin", $AdminPin,
         "--cashier-pin", $CashierPin,
         "--register-count", "$RegisterCount",
         "--overwrite-env"
     )
+
+    if ($StoreRut) {
+        $args += @("--store-rut", $StoreRut)
+    }
+
+    if ($StoreAddress) {
+        $args += @("--store-address", $StoreAddress)
+    }
 
     if ($WithDemoData.IsPresent) {
         $args += "--with-demo-data"

@@ -1,13 +1,19 @@
-from fastapi import Depends, FastAPI
+from pathlib import Path
+
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from app.api.deps import require_admin
-from app.core.config import settings
+from app.core.config import ROOT_DIR, settings
 from app.api.routes import products, sales, cash, kardex, reports, users, dashboard, orders
 from app.schemas.config import ConfigUpdate, ConfigResponse
 from app.tax.sii.boleta import router as sii_router
 
 app = FastAPI(title="MiniMarket POS Server", version="1.0.0")
+
+ADMIN_DIST_DIR = ROOT_DIR.parent / "admin-web" / "dist"
+ADMIN_INDEX_FILE = ADMIN_DIST_DIR / "index.html"
 
 allowed_origins = [
     origin.strip()
@@ -62,3 +68,35 @@ def update_config(data: ConfigUpdate):
         },
         "error": None,
     }
+
+
+def _resolve_admin_asset(full_path: str) -> Path | None:
+    if not ADMIN_INDEX_FILE.exists():
+        return None
+
+    if not full_path:
+        return ADMIN_INDEX_FILE
+
+    candidate = (ADMIN_DIST_DIR / full_path).resolve()
+    dist_root = ADMIN_DIST_DIR.resolve()
+    if not candidate.is_relative_to(dist_root):
+        return None
+
+    if candidate.is_file():
+        return candidate
+
+    if candidate.suffix:
+        return None
+
+    return ADMIN_INDEX_FILE
+
+
+@app.get("/admin", include_in_schema=False)
+@app.get("/admin/{full_path:path}", include_in_schema=False)
+def serve_admin_web(full_path: str = ""):
+    target = _resolve_admin_asset(full_path)
+    if not target:
+        if not ADMIN_INDEX_FILE.exists():
+            raise HTTPException(status_code=404, detail="Admin web is not built")
+        raise HTTPException(status_code=404, detail="Admin asset not found")
+    return FileResponse(target)

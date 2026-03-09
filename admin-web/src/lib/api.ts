@@ -1,9 +1,27 @@
 import axios from 'axios'
 
+function resolveAdminPath(path: string): string {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  const base = import.meta.env.BASE_URL?.replace(/\/$/, '')
+  if (!base || base === '/') return normalizedPath
+  return `${base}${normalizedPath}`
+}
+
+function resolveWindowOrigin(): string {
+  if (typeof window === 'undefined') return 'http://localhost:8000'
+
+  const origin = window.location.origin
+  if (window.location.port === '5174') {
+    return 'http://localhost:8000'
+  }
+
+  return origin
+}
+
 function resolveBaseUrl(): string {
   const envUrl = import.meta.env.VITE_API_URL
   if (envUrl) return envUrl
-  return localStorage.getItem('admin_server_url') || 'http://localhost:8000'
+  return localStorage.getItem('admin_server_url') || resolveWindowOrigin()
 }
 
 const api = axios.create({
@@ -11,7 +29,7 @@ const api = axios.create({
   timeout: 15000,
 })
 
-// Inject admin role header
+// Inject admin role header.
 api.interceptors.request.use((config) => {
   const userJson = localStorage.getItem('admin_user')
   if (userJson) {
@@ -21,13 +39,13 @@ api.interceptors.request.use((config) => {
         config.headers['X-User-Role'] = 'admin'
       }
     } catch {
-      // corrupted localStorage — ignore
+      // Ignore corrupted localStorage.
     }
   }
   return config
 })
 
-// Handle API errors globally
+// Handle API errors globally.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -38,17 +56,16 @@ api.interceptors.response.use(
     const status = error.response.status
     const detail = error.response.data?.detail
 
-    // Session expired or forbidden — force logout
     if (status === 401 || status === 403) {
-      const msg = typeof detail === 'object' ? detail.message : 'Sesión expirada'
+      const msg = typeof detail === 'object' ? detail.message : 'Sesion expirada'
+      const loginPath = resolveAdminPath('/login')
       localStorage.removeItem('admin_user')
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login'
+      if (window.location.pathname !== loginPath) {
+        window.location.href = loginPath
       }
       return Promise.reject(new Error(msg))
     }
 
-    // Extract server error message
     if (detail) {
       const msg = typeof detail === 'object' ? detail.message : String(detail)
       return Promise.reject(new Error(msg))
@@ -66,7 +83,7 @@ export function setServerUrl(url: string) {
 export function getServerUrl(): string {
   const envUrl = import.meta.env.VITE_API_URL
   if (envUrl) return envUrl
-  return localStorage.getItem('admin_server_url') || 'http://localhost:8000'
+  return localStorage.getItem('admin_server_url') || resolveWindowOrigin()
 }
 
 export default api

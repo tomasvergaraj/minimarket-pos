@@ -28,11 +28,17 @@ function LoginGuard() {
   return <LoginPage />
 }
 
+function resolveRouterBase(): string | undefined {
+  const base = import.meta.env.BASE_URL?.replace(/\/$/, '')
+  if (!base || base === '/') return undefined
+  return base
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <BrowserRouter>
+        <BrowserRouter basename={resolveRouterBase()}>
           <Routes>
             <Route path="/login" element={<LoginGuard />} />
             <Route element={<AdminLayout />}>

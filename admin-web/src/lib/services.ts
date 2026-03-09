@@ -110,6 +110,12 @@ export async function createProduct(data: ProductCreate): Promise<Product> {
       stock: data.stock ?? 0,
       min_stock: data.min_stock ?? 0,
       is_active: true,
+      is_pack: data.is_pack ?? false,
+      units_contained: data.units_contained ?? 1,
+      base_product_id: data.base_product_id ?? null,
+      discount_price: data.discount_price ?? null,
+      discount_ends_at: data.discount_ends_at ?? null,
+      is_on_offer: data.discount_price != null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }

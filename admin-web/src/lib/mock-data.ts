@@ -9,7 +9,7 @@ import type {
   StoreConfig,
 } from '../types'
 
-// ── Users ──
+// Users
 
 export const mockUsers: User[] = [
   {
@@ -23,7 +23,7 @@ export const mockUsers: User[] = [
   {
     id: 'u-002',
     username: 'cajero.ana',
-    full_name: 'Ana López',
+    full_name: 'Ana Lopez',
     role: 'cashier',
     is_active: true,
     created_at: '2026-01-12T09:00:00',
@@ -31,7 +31,7 @@ export const mockUsers: User[] = [
   {
     id: 'u-003',
     username: 'cajero.pedro',
-    full_name: 'Pedro Muñoz',
+    full_name: 'Pedro Munoz',
     role: 'cashier',
     is_active: true,
     created_at: '2026-01-15T10:00:00',
@@ -39,17 +39,39 @@ export const mockUsers: User[] = [
   {
     id: 'u-004',
     username: 'cajero.maria',
-    full_name: 'María González',
+    full_name: 'Maria Gonzalez',
     role: 'cashier',
     is_active: false,
     created_at: '2026-01-20T11:00:00',
   },
 ]
 
-// ── Products ──
+// Products
+
+function withProductDefaults(
+  product: Omit<
+    Product,
+    | 'is_pack'
+    | 'units_contained'
+    | 'base_product_id'
+    | 'discount_price'
+    | 'discount_ends_at'
+    | 'is_on_offer'
+  >
+): Product {
+  return {
+    is_pack: false,
+    units_contained: 1,
+    base_product_id: null,
+    discount_price: null,
+    discount_ends_at: null,
+    is_on_offer: false,
+    ...product,
+  }
+}
 
 export const mockProducts: Product[] = [
-  {
+  withProductDefaults({
     id: 'p-001',
     sku: 'BEB-001',
     barcode: '7801234560012',
@@ -65,8 +87,8 @@ export const mockProducts: Product[] = [
     is_active: true,
     created_at: '2026-01-10T08:00:00',
     updated_at: '2026-02-15T12:00:00',
-  },
-  {
+  }),
+  withProductDefaults({
     id: 'p-002',
     sku: 'BEB-002',
     barcode: '7801234560029',
@@ -82,14 +104,14 @@ export const mockProducts: Product[] = [
     is_active: true,
     created_at: '2026-01-10T08:00:00',
     updated_at: '2026-02-15T12:00:00',
-  },
-  {
+  }),
+  withProductDefaults({
     id: 'p-003',
     sku: 'PAN-001',
     barcode: '7801234560036',
     name: 'Pan de Molde Integral',
     description: 'Pan integral 600g',
-    category: 'Panadería',
+    category: 'Panaderia',
     unit: 'un',
     cost_price: 1200,
     sell_price: 2190,
@@ -99,14 +121,14 @@ export const mockProducts: Product[] = [
     is_active: true,
     created_at: '2026-01-11T08:00:00',
     updated_at: '2026-02-14T10:00:00',
-  },
-  {
+  }),
+  withProductDefaults({
     id: 'p-004',
     sku: 'LAC-001',
     barcode: '7801234560043',
     name: 'Leche Entera 1L',
     description: 'Leche entera larga vida',
-    category: 'Lácteos',
+    category: 'Lacteos',
     unit: 'un',
     cost_price: 650,
     sell_price: 1190,
@@ -116,12 +138,12 @@ export const mockProducts: Product[] = [
     is_active: true,
     created_at: '2026-01-11T08:00:00',
     updated_at: '2026-02-15T09:00:00',
-  },
-  {
+  }),
+  withProductDefaults({
     id: 'p-005',
     sku: 'SNK-001',
     barcode: '7801234560050',
-    name: 'Papas Fritas Clásicas 150g',
+    name: 'Papas Fritas Clasicas 150g',
     description: 'Snack papas fritas',
     category: 'Snacks',
     unit: 'un',
@@ -133,12 +155,12 @@ export const mockProducts: Product[] = [
     is_active: true,
     created_at: '2026-01-12T08:00:00',
     updated_at: '2026-02-15T14:00:00',
-  },
-  {
+  }),
+  withProductDefaults({
     id: 'p-006',
     sku: 'LIM-001',
     barcode: '7801234560067',
-    name: 'Detergente Líquido 1L',
+    name: 'Detergente Liquido 1L',
     description: 'Detergente multiuso',
     category: 'Limpieza',
     unit: 'un',
@@ -150,8 +172,8 @@ export const mockProducts: Product[] = [
     is_active: true,
     created_at: '2026-01-12T08:00:00',
     updated_at: '2026-02-14T16:00:00',
-  },
-  {
+  }),
+  withProductDefaults({
     id: 'p-007',
     sku: 'BEB-003',
     barcode: '7801234560074',
@@ -167,14 +189,14 @@ export const mockProducts: Product[] = [
     is_active: true,
     created_at: '2026-01-13T08:00:00',
     updated_at: '2026-02-15T11:00:00',
-  },
-  {
+  }),
+  withProductDefaults({
     id: 'p-008',
     sku: 'LAC-002',
     barcode: '7801234560081',
     name: 'Yogurt Natural 170g',
-    description: 'Yogurt natural sin azúcar',
-    category: 'Lácteos',
+    description: 'Yogurt natural sin azucar',
+    category: 'Lacteos',
     unit: 'un',
     cost_price: 350,
     sell_price: 690,
@@ -184,17 +206,17 @@ export const mockProducts: Product[] = [
     is_active: true,
     created_at: '2026-01-13T08:00:00',
     updated_at: '2026-02-15T08:00:00',
-  },
+  }),
 ]
 
-// ── Cash Registers ──
+// Cash Registers
 
 export const mockRegisters: CashRegister[] = [
   { id: 'r-001', name: 'Caja 1', is_active: true, created_at: '2026-01-10T08:00:00' },
   { id: 'r-002', name: 'Caja 2', is_active: true, created_at: '2026-01-10T08:00:00' },
 ]
 
-// ── Cash Sessions ──
+// Cash Sessions
 
 export const mockSessions: CashSession[] = [
   {
@@ -244,7 +266,7 @@ export const mockSessions: CashSession[] = [
   },
 ]
 
-// ── Sales ──
+// Sales
 
 export const mockSales: Sale[] = [
   {
@@ -277,7 +299,7 @@ export const mockSales: Sale[] = [
       {
         id: 'si-002',
         product_id: 'p-005',
-        product_name: 'Papas Fritas Clásicas 150g',
+        product_name: 'Papas Fritas Clasicas 150g',
         product_sku: 'SNK-001',
         quantity: 1,
         unit_price: 990,
@@ -317,7 +339,7 @@ export const mockSales: Sale[] = [
       {
         id: 'si-004',
         product_id: 'p-006',
-        product_name: 'Detergente Líquido 1L',
+        product_name: 'Detergente Liquido 1L',
         product_sku: 'LIM-001',
         quantity: 2,
         unit_price: 3490,
@@ -471,7 +493,7 @@ export const mockSales: Sale[] = [
   },
 ]
 
-// ── Kardex ──
+// Kardex
 
 export const mockKardex: KardexEntry[] = [
   {
@@ -482,7 +504,7 @@ export const mockKardex: KardexEntry[] = [
     stock_before: 10,
     stock_after: 60,
     reference_id: null,
-    notes: 'Reposición semanal',
+    notes: 'Reposicion semanal',
     user_id: 'u-001',
     created_at: '2026-02-14T07:00:00',
   },
@@ -518,13 +540,13 @@ export const mockKardex: KardexEntry[] = [
     stock_before: 5,
     stock_after: 0,
     reference_id: null,
-    notes: 'Ajuste inventario físico',
+    notes: 'Ajuste inventario fisico',
     user_id: 'u-001',
     created_at: '2026-02-15T08:00:00',
   },
 ]
 
-// ── Dashboard ──
+// Dashboard
 
 export const mockDashboardStats: DashboardStats = {
   ventas_hoy: 42,
@@ -538,11 +560,11 @@ export const mockDashboardStats: DashboardStats = {
     { product_id: 'p-004', product_name: 'Leche Entera 1L', quantity_sold: 12, revenue: 14280 },
     { product_id: 'p-003', product_name: 'Pan de Molde Integral', quantity_sold: 9, revenue: 19710 },
     { product_id: 'p-002', product_name: 'Agua Mineral 600ml', quantity_sold: 8, revenue: 4720 },
-    { product_id: 'p-006', product_name: 'Detergente Líquido 1L', quantity_sold: 6, revenue: 20940 },
+    { product_id: 'p-006', product_name: 'Detergente Liquido 1L', quantity_sold: 6, revenue: 20940 },
   ],
 }
 
-// ── Config ──
+// Config
 
 export const mockConfig: StoreConfig = {
   store_name: 'MiniMarket Central',

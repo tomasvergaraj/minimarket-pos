@@ -16,8 +16,10 @@ param(
     [switch]$WithDemoData,
     [switch]$SkipFirewall,
     [switch]$SkipAutoStart,
+    [switch]$SkipAdminBuild,
     [string]$PythonWingetId = "Python.Python.3.12",
-    [string]$PostgresWingetId = "PostgreSQL.PostgreSQL.16"
+    [string]$PostgresWingetId = "PostgreSQL.PostgreSQL.16",
+    [string]$NodeWingetId = "OpenJS.NodeJS.LTS"
 )
 
 Set-StrictMode -Version Latest
@@ -88,6 +90,43 @@ function Find-CommandPath {
     return $null
 }
 
+function Find-NodeInstallDir {
+    $nodePath = Find-CommandPath "node"
+    if ($nodePath) {
+        return Split-Path $nodePath -Parent
+    }
+
+    $candidates = @(
+        "C:\Program Files\nodejs",
+        "C:\Program Files (x86)\nodejs",
+        (Join-Path $env:LOCALAPPDATA "Programs\nodejs")
+    )
+
+    foreach ($candidate in $candidates) {
+        if (Test-Path (Join-Path $candidate "node.exe")) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
+function Get-NodeVersion {
+    param([string]$NodeExe)
+
+    if (-not (Test-Path $NodeExe)) {
+        return $null
+    }
+
+    $output = & $NodeExe --version
+    if ($LASTEXITCODE -ne 0 -or -not $output) {
+        return $null
+    }
+
+    $normalized = $output.Trim().TrimStart("v")
+    return [version]$normalized
+}
+
 function Get-PythonExe {
     $candidates = @(
         (Find-CommandPath "py"),
@@ -147,6 +186,47 @@ function Ensure-Winget {
     if (-not (Find-CommandPath "winget")) {
         throw "winget is required for first-run installation of Python/PostgreSQL."
     }
+}
+
+function Ensure-Node {
+    if ($SkipAdminBuild.IsPresent) {
+        return $null
+    }
+
+    $nodeDir = Find-NodeInstallDir
+    if ($nodeDir) {
+        $nodeVersion = Get-NodeVersion -NodeExe (Join-Path $nodeDir "node.exe")
+        if ($nodeVersion -and $nodeVersion -ge [version]"20.0.0") {
+            if ($env:Path.IndexOf($nodeDir, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+                $env:Path = "$nodeDir;$env:Path"
+            }
+            return $nodeDir
+        }
+    }
+
+    Ensure-Winget
+    Write-Step "Installing Node.js via winget"
+    winget install --id $NodeWingetId --exact --silent --accept-package-agreements --accept-source-agreements
+    if ($LASTEXITCODE -ne 0) {
+        throw "Node.js installation failed."
+    }
+
+    Start-Sleep -Seconds 5
+    $nodeDir = Find-NodeInstallDir
+    if (-not $nodeDir) {
+        throw "Node.js was installed but could not be located."
+    }
+
+    if ($env:Path.IndexOf($nodeDir, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+        $env:Path = "$nodeDir;$env:Path"
+    }
+
+    $nodeVersion = Get-NodeVersion -NodeExe (Join-Path $nodeDir "node.exe")
+    if (-not $nodeVersion -or $nodeVersion -lt [version]"20.0.0") {
+        throw "Node.js 20+ is required to build admin-web."
+    }
+
+    return $nodeDir
 }
 
 function Ensure-Python {
@@ -484,6 +564,46 @@ function Ensure-AutostartTask {
     schtasks /Run /TN $taskName | Out-Null
 }
 
+function Build-AdminWeb {
+    param(
+        [string]$RepoRoot,
+        [string]$NodeDir
+    )
+
+    if ($SkipAdminBuild.IsPresent) {
+        return
+    }
+
+    $adminDir = Join-Path $RepoRoot "admin-web"
+    if (-not (Test-Path (Join-Path $adminDir "package.json"))) {
+        throw "admin-web package.json not found."
+    }
+
+    $npmCmd = Join-Path $NodeDir "npm.cmd"
+    if (-not (Test-Path $npmCmd)) {
+        $npmCmd = Find-CommandPath "npm.cmd"
+    }
+    if (-not $npmCmd) {
+        throw "npm.cmd could not be located."
+    }
+
+    Write-Step "Building admin web"
+    Push-Location $adminDir
+    try {
+        & $npmCmd ci | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            throw "admin-web dependency installation failed."
+        }
+
+        & $npmCmd run build | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            throw "admin-web build failed."
+        }
+    } finally {
+        Pop-Location
+    }
+}
+
 Ensure-Elevation
 
 if (-not $DatabasePassword) {
@@ -499,6 +619,9 @@ if (-not (Test-Path (Join-Path $serverDir "bootstrap.py"))) {
 
 Write-Step "Resolving Python"
 $pythonCommand = Ensure-Python
+
+Write-Step "Resolving Node.js"
+$nodeDir = Ensure-Node
 
 Write-Step "Resolving PostgreSQL"
 $postgresBinDir = Ensure-Postgres
@@ -519,6 +642,7 @@ Ensure-DatabaseOwnership -PsqlExe $psqlExe -AppDbName $DatabaseName -AppDbUser $
 
 $databaseUrl = "postgresql://${DatabaseUser}:${DatabasePassword}@localhost:5432/$DatabaseName"
 $venvPython = Ensure-Venv -PythonCommand $pythonCommand -ServerDir $serverDir
+Build-AdminWeb -RepoRoot $repoRoot -NodeDir $nodeDir
 Invoke-Bootstrap -PythonExe $venvPython -ServerDir $serverDir -DatabaseUrl $databaseUrl
 Ensure-FirewallRule -Port $ServerPort
 Ensure-AutostartTask -PythonExe $venvPython -ServerDir $serverDir
@@ -526,6 +650,9 @@ Ensure-AutostartTask -PythonExe $venvPython -ServerDir $serverDir
 Write-Host ""
 Write-Host "MiniMarket POS server installation completed." -ForegroundColor Green
 Write-Host "API URL: http://localhost:$ServerPort"
+if (-not $SkipAdminBuild.IsPresent) {
+    Write-Host "Admin URL: http://localhost:$ServerPort/admin"
+}
 Write-Host "Admin PIN: $AdminPin"
 Write-Host "Cashier PIN: $CashierPin"
 Write-Host "Database user: $DatabaseUser"

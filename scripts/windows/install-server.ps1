@@ -253,14 +253,15 @@ function Wait-ForPostgres {
 function Invoke-PsqlScript {
     param(
         [string]$PsqlExe,
-        [string]$Sql
+        [string]$Sql,
+        [string]$DatabaseName = "postgres"
     )
 
     $tempFile = [System.IO.Path]::GetTempFileName()
     try {
         $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
         [System.IO.File]::WriteAllText($tempFile, $Sql, $utf8NoBom)
-        & $PsqlExe -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f $tempFile
+        & $PsqlExe -h localhost -U postgres -d $DatabaseName -v ON_ERROR_STOP=1 -f $tempFile
         if ($LASTEXITCODE -ne 0) {
             throw "psql execution failed."
         }
@@ -319,7 +320,7 @@ GRANT ALL PRIVILEGES ON DATABASE __APP_DB_NAME_IDENTIFIER__ TO __APP_DB_USER_IDE
     $sql = $sql.Replace("__APP_DB_USER_IDENTIFIER__", $AppDbUser)
     $sql = $sql.Replace("__APP_DB_NAME_IDENTIFIER__", $AppDbName)
 
-    Invoke-PsqlScript -PsqlExe $PsqlExe -Sql $sql
+    Invoke-PsqlScript -PsqlExe $PsqlExe -Sql $sql -DatabaseName "postgres"
 }
 
 function Ensure-DatabaseOwnership {
@@ -379,7 +380,7 @@ $$;
     $sql = $sql.Replace("__APP_DB_USER_IDENTIFIER__", $AppDbUser)
     $sql = $sql.Replace("__APP_DB_NAME_IDENTIFIER__", $AppDbName)
 
-    Invoke-PsqlScript -PsqlExe $PsqlExe -Sql $sql
+    Invoke-PsqlScript -PsqlExe $PsqlExe -Sql $sql -DatabaseName $AppDbName
 }
 
 function Ensure-Venv {

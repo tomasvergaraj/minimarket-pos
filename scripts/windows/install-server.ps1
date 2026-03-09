@@ -322,6 +322,66 @@ GRANT ALL PRIVILEGES ON DATABASE __APP_DB_NAME_IDENTIFIER__ TO __APP_DB_USER_IDE
     Invoke-PsqlScript -PsqlExe $PsqlExe -Sql $sql
 }
 
+function Ensure-DatabaseOwnership {
+    param(
+        [string]$PsqlExe,
+        [string]$AppDbName,
+        [string]$AppDbUser
+    )
+
+    Assert-SqlIdentifier -Value $AppDbName -Label "DatabaseName"
+    Assert-SqlIdentifier -Value $AppDbUser -Label "DatabaseUser"
+
+    $sql = @'
+ALTER DATABASE __APP_DB_NAME_IDENTIFIER__ OWNER TO __APP_DB_USER_IDENTIFIER__;
+ALTER SCHEMA public OWNER TO __APP_DB_USER_IDENTIFIER__;
+
+GRANT ALL PRIVILEGES ON DATABASE __APP_DB_NAME_IDENTIFIER__ TO __APP_DB_USER_IDENTIFIER__;
+GRANT ALL PRIVILEGES ON SCHEMA public TO __APP_DB_USER_IDENTIFIER__;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO __APP_DB_USER_IDENTIFIER__;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO __APP_DB_USER_IDENTIFIER__;
+GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO __APP_DB_USER_IDENTIFIER__;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO __APP_DB_USER_IDENTIFIER__;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO __APP_DB_USER_IDENTIFIER__;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON FUNCTIONS TO __APP_DB_USER_IDENTIFIER__;
+
+DO $$
+DECLARE
+    obj record;
+BEGIN
+    FOR obj IN
+        SELECT tablename
+        FROM pg_tables
+        WHERE schemaname = 'public'
+    LOOP
+        EXECUTE format('ALTER TABLE public.%I OWNER TO __APP_DB_USER_IDENTIFIER__', obj.tablename);
+    END LOOP;
+
+    FOR obj IN
+        SELECT sequence_name
+        FROM information_schema.sequences
+        WHERE sequence_schema = 'public'
+    LOOP
+        EXECUTE format('ALTER SEQUENCE public.%I OWNER TO __APP_DB_USER_IDENTIFIER__', obj.sequence_name);
+    END LOOP;
+
+    FOR obj IN
+        SELECT table_name
+        FROM information_schema.views
+        WHERE table_schema = 'public'
+    LOOP
+        EXECUTE format('ALTER VIEW public.%I OWNER TO __APP_DB_USER_IDENTIFIER__', obj.table_name);
+    END LOOP;
+END
+$$;
+'@
+    $sql = $sql.Replace("__APP_DB_USER_IDENTIFIER__", $AppDbUser)
+    $sql = $sql.Replace("__APP_DB_NAME_IDENTIFIER__", $AppDbName)
+
+    Invoke-PsqlScript -PsqlExe $PsqlExe -Sql $sql
+}
+
 function Ensure-Venv {
     param(
         [string[]]$PythonCommand,
@@ -448,6 +508,13 @@ Wait-ForPostgres -PsqlExe $psqlExe
 
 Write-Step "Creating application database and role"
 Ensure-Database -PsqlExe $psqlExe -AppDbName $DatabaseName -AppDbUser $DatabaseUser -AppDbPassword $DatabasePassword
+
+Write-Step "Normalizing database ownership and privileges"
+& $psqlExe -h localhost -U postgres -d $DatabaseName -c "SELECT 1;" | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not connect to application database as postgres."
+}
+Ensure-DatabaseOwnership -PsqlExe $psqlExe -AppDbName $DatabaseName -AppDbUser $DatabaseUser
 
 $databaseUrl = "postgresql://${DatabaseUser}:${DatabasePassword}@localhost:5432/$DatabaseName"
 $venvPython = Ensure-Venv -PythonCommand $pythonCommand -ServerDir $serverDir

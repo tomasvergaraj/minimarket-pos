@@ -335,12 +335,12 @@ function Ensure-Venv {
     }
 
     Write-Step "Installing backend dependencies"
-    & $venvPython -m pip install --upgrade pip
+    & $venvPython -m pip install --upgrade pip | Out-Host
     if ($LASTEXITCODE -ne 0) {
         throw "pip upgrade failed."
     }
 
-    & $venvPython -m pip install -r (Join-Path $ServerDir "requirements.txt")
+    & $venvPython -m pip install -r (Join-Path $ServerDir "requirements.txt") | Out-Host
     if ($LASTEXITCODE -ne 0) {
         throw "Dependency installation failed."
     }

@@ -258,13 +258,27 @@ function Invoke-PsqlScript {
 
     $tempFile = [System.IO.Path]::GetTempFileName()
     try {
-        Set-Content -Path $tempFile -Value $Sql -Encoding UTF8
+        $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+        [System.IO.File]::WriteAllText($tempFile, $Sql, $utf8NoBom)
         & $PsqlExe -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -f $tempFile
         if ($LASTEXITCODE -ne 0) {
             throw "psql execution failed."
         }
     } finally {
         Remove-Item $tempFile -ErrorAction SilentlyContinue
+    }
+}
+
+function ConvertTo-SqlLiteral {
+    param([string]$Value)
+    return $Value.Replace("'", "''")
+}
+
+function Assert-SqlIdentifier {
+    param([string]$Value, [string]$Label)
+
+    if ($Value -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') {
+        throw "$Label must use only letters, numbers and underscores, and cannot start with a number."
     }
 }
 
@@ -276,22 +290,34 @@ function Ensure-Database {
         [string]$AppDbPassword
     )
 
-    $sql = @"
+    Assert-SqlIdentifier -Value $AppDbName -Label "DatabaseName"
+    Assert-SqlIdentifier -Value $AppDbUser -Label "DatabaseUser"
+
+    $userLiteral = ConvertTo-SqlLiteral -Value $AppDbUser
+    $passwordLiteral = ConvertTo-SqlLiteral -Value $AppDbPassword
+    $dbLiteral = ConvertTo-SqlLiteral -Value $AppDbName
+
+    $sql = @'
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '$AppDbUser') THEN
-        CREATE ROLE $AppDbUser LOGIN PASSWORD '$AppDbPassword';
+    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '__APP_DB_USER_LITERAL__') THEN
+        CREATE ROLE __APP_DB_USER_IDENTIFIER__ LOGIN PASSWORD '__APP_DB_PASSWORD_LITERAL__';
     ELSE
-        ALTER ROLE $AppDbUser WITH LOGIN PASSWORD '$AppDbPassword';
+        ALTER ROLE __APP_DB_USER_IDENTIFIER__ WITH LOGIN PASSWORD '__APP_DB_PASSWORD_LITERAL__';
     END IF;
 END
 $$;
 
-SELECT 'CREATE DATABASE $AppDbName OWNER $AppDbUser'
-WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$AppDbName')\gexec
+SELECT 'CREATE DATABASE __APP_DB_NAME_IDENTIFIER__ OWNER __APP_DB_USER_IDENTIFIER__'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '__APP_DB_NAME_LITERAL__')\gexec
 
-GRANT ALL PRIVILEGES ON DATABASE $AppDbName TO $AppDbUser;
-"@
+GRANT ALL PRIVILEGES ON DATABASE __APP_DB_NAME_IDENTIFIER__ TO __APP_DB_USER_IDENTIFIER__;
+'@
+    $sql = $sql.Replace("__APP_DB_USER_LITERAL__", $userLiteral)
+    $sql = $sql.Replace("__APP_DB_PASSWORD_LITERAL__", $passwordLiteral)
+    $sql = $sql.Replace("__APP_DB_NAME_LITERAL__", $dbLiteral)
+    $sql = $sql.Replace("__APP_DB_USER_IDENTIFIER__", $AppDbUser)
+    $sql = $sql.Replace("__APP_DB_NAME_IDENTIFIER__", $AppDbName)
 
     Invoke-PsqlScript -PsqlExe $PsqlExe -Sql $sql
 }

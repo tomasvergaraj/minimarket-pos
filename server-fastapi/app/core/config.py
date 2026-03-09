@@ -1,4 +1,9 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings
+
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
@@ -31,7 +36,7 @@ class Settings(BaseSettings):
         return "https://maullin.sii.cl"
 
     class Config:
-        env_file = ".env"
+        env_file = ROOT_DIR / ".env"
 
 
 settings = Settings()

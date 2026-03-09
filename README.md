@@ -54,6 +54,31 @@ python seed.py                # crea tablas + datos demo
 python run.py                 # inicia en http://0.0.0.0:8000
 ```
 
+### InstalaciÃ³n automÃ¡tica Windows (servidor)
+
+Primera versiÃ³n de instalador automatizado:
+
+```bat
+scripts\windows\install-server.cmd
+```
+
+QuÃ© hace:
+
+- eleva permisos a administrador
+- instala Python 3.11+ con `winget` si falta
+- instala PostgreSQL con `winget` si falta
+- crea usuario y base de datos de la app
+- crea/actualiza `server-fastapi/.env`
+- inicializa schema y datos base del sistema
+- abre el puerto `8000` en firewall
+- registra una tarea de inicio automÃ¡tico para el backend
+
+Notas:
+
+- si PostgreSQL ya estÃ¡ instalado, debes pasar `-PostgresSuperPassword` al script PowerShell
+- por defecto crea sÃ³lo datos base (admin, cajero, cajas); agrega `-WithDemoData` si quieres catÃ¡logo demo
+- usa `server-fastapi/serve.py` para arranque sin `reload`
+
 ### 3. Cliente (cada caja)
 
 ```bat

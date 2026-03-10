@@ -1,12 +1,19 @@
 from pathlib import Path
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=ROOT_DIR / ".env",
+        env_file_encoding="utf-8",
+        env_ignore_empty=True,
+        extra="ignore",
+    )
+
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/minimarket_pos"
     SERVER_HOST: str = "0.0.0.0"
     SERVER_PORT: int = 8000
@@ -35,8 +42,19 @@ class Settings(BaseSettings):
             return "https://palena.sii.cl"
         return "https://maullin.sii.cl"
 
-    class Config:
-        env_file = ROOT_DIR / ".env"
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls,
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
+    ):
+        # In this project the local backend .env is the source of truth.
+        # Put dotenv ahead of process env so stale launcher variables do not
+        # silently disable SII or clear certificate/CAF paths.
+        return init_settings, dotenv_settings, env_settings, file_secret_settings
 
 
 settings = Settings()

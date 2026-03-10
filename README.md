@@ -181,15 +181,23 @@ El instalador se genera en `client-electron-pos/dist-electron/`.
 
 Configurado con `electron-updater`. Publica releases en GitHub y la app se actualiza automáticamente. Editar `build.publish` en `package.json` con tu usuario/repo de GitHub.
 
-## Instalar servidor como servicio Windows
+## Instalar backend con arranque automático en Windows
 
-Requiere [NSSM](https://nssm.cc/download) en el PATH:
+Usa el Programador de tareas de Windows; no requiere NSSM ni software extra.
 
 ```bash
 cd server-fastapi
-python install_service.py           # instalar
-python install_service.py uninstall # desinstalar
+python install_service.py install
+python install_service.py status
+python install_service.py restart
+python install_service.py uninstall
 ```
+
+Notas:
+
+- ejecutar desde una terminal con privilegios de administrador
+- registra la tarea `MiniMarketPOS-Server`
+- arranca `server-fastapi/start-service.cmd`, que usa `venv\Scripts\python.exe` y `serve.py`
 
 ## Sync cloud (Supabase)
 

@@ -3,7 +3,10 @@
 interface PrinterInfo {
   name: string;
   displayName: string;
+  description?: string;
   isDefault: boolean;
+  status?: number;
+  source?: "electron" | "windows" | "merged";
 }
 
 interface ElectronAPI {

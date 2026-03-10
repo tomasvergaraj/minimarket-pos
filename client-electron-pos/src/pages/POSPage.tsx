@@ -1,33 +1,41 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  AlertTriangle,
+  ClipboardList,
+  LogOut,
+  Minus,
+  Plus,
+  Printer,
+  Save,
+  Search,
+  Settings,
+  Trash2,
+  X,
+} from "lucide-react";
+import toast from "react-hot-toast";
+
 import { useAuthStore } from "@/stores/authStore";
 import { useCartStore } from "@/stores/cartStore";
 import { formatCLP } from "@/utils/format";
 import api from "@/services/api";
-import toast from "react-hot-toast";
-import type { Product, Sale, Order, CartItem } from "@/types";
+import type { CartItem, Order, Product, Sale } from "@/types";
 import PaymentModal from "@/components/PaymentModal";
 import CloseSessionModal from "@/components/CloseSessionModal";
 import ReceiptPreviewModal from "@/components/ReceiptPreviewModal";
+import OrderPreviewModal from "@/components/OrderPreviewModal";
 import FavoritesPanel from "@/components/FavoritesPanel";
 import OrdersModal from "@/components/OrdersModal";
-import {
-  Search, Trash2, Plus, Minus, LogOut, X, Settings,
-  AlertTriangle, ClipboardList, Save, Printer
-} from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { buildOrderContent } from "@/services/printer";
-import { getSavedPrinterName } from "@/pages/SettingsPage";
 
-/** Devuelve clase de color según stock disponible vs mínimo */
 function stockColor(stock: number, minStock: number) {
   if (stock <= 0) return "text-red-600 font-semibold";
   if (stock <= minStock) return "text-yellow-600 font-semibold";
   return "text-green-600";
 }
 
-/** Badge de stock para el carrito: muestra unidades restantes tras restar lo del carrito */
 function StockBadge({ remaining, minStock }: { remaining: number; minStock: number }) {
   if (remaining > minStock) return null;
+
   if (remaining <= 0) {
     return (
       <span className="flex items-center gap-1 text-xs text-red-600 font-semibold">
@@ -35,6 +43,7 @@ function StockBadge({ remaining, minStock }: { remaining: number; minStock: numb
       </span>
     );
   }
+
   return (
     <span className="flex items-center gap-1 text-xs text-yellow-600 font-semibold">
       <AlertTriangle size={11} /> Solo quedan {remaining}
@@ -43,21 +52,26 @@ function StockBadge({ remaining, minStock }: { remaining: number; minStock: numb
 }
 
 export default function POSPage() {
-  const { user, register, session } = useAuthStore();
+  const { user, register } = useAuthStore();
   const { items, addItem, removeItem, updateQuantity, clear, total } = useCartStore();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [showPayment, setShowPayment] = useState(false);
   const [showCloseSession, setShowCloseSession] = useState(false);
   const [showOrders, setShowOrders] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
+  const [previewOrder, setPreviewOrder] = useState<Order | null>(null);
+
   const searchRef = useRef<HTMLInputElement>(null);
+  const searchTimeoutRef = useRef<number | null>(null);
+  const pendingBarcodeLookupsRef = useRef<Set<string>>(new Set());
   const navigate = useNavigate();
 
-  // Comanda (order) tracking
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [showOrderRef, setShowOrderRef] = useState(false);
   const [orderRef, setOrderRef] = useState("");
+  const [orderNotes, setOrderNotes] = useState("");
   const [savingOrder, setSavingOrder] = useState(false);
 
   const tryAddItem = useCallback((product: Product) => {
@@ -65,112 +79,160 @@ export default function POSPage() {
       toast.error(`${product.name}: sin stock`);
       return;
     }
+
     const ok = addItem(product, 1);
     if (!ok) {
-      toast.error(`Stock insuficiente — disponibles: ${product.stock}`);
+      toast.error(`Stock insuficiente - disponibles: ${product.stock}`);
     } else {
       toast.success(`${product.name} agregado`);
     }
   }, [addItem]);
 
-  const handleSearch = useCallback(async (query: string) => {
+  const clearScheduledSearch = useCallback(() => {
+    if (searchTimeoutRef.current !== null) {
+      window.clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+    }
+  }, []);
+
+  const handleSearch = useCallback(async (query: string, options?: { immediate?: boolean }) => {
     const trimmed = query.trim();
-    if (!trimmed) { setSearchResults([]); return; }
+
+    if (options?.immediate) clearScheduledSearch();
+    if (!trimmed) {
+      setSearchResults([]);
+      return;
+    }
+
     try {
       if (/^\d+$/.test(trimmed)) {
+        if (pendingBarcodeLookupsRef.current.has(trimmed)) return;
+
+        pendingBarcodeLookupsRef.current.add(trimmed);
         try {
           const { data } = await api.get(`/products/barcode/${trimmed}`);
           tryAddItem(data);
-          setSearchQuery("");
+          setSearchQuery((current) => (current.trim() === trimmed ? "" : current));
           setSearchResults([]);
           return;
-        } catch { /* not a barcode */ }
+        } catch {
+          // Falls back to normal product search when the barcode route misses.
+        } finally {
+          pendingBarcodeLookupsRef.current.delete(trimmed);
+        }
       }
+
       const { data } = await api.get("/products/", { params: { search: trimmed } });
       setSearchResults(data);
     } catch {
       toast.error("Error buscando productos");
     }
-  }, [tryAddItem]);
+  }, [clearScheduledSearch, tryAddItem]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchQuery.length >= 2) handleSearch(searchQuery);
-      else setSearchResults([]);
+    clearScheduledSearch();
+
+    if (searchQuery.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    searchTimeoutRef.current = window.setTimeout(() => {
+      searchTimeoutRef.current = null;
+      void handleSearch(searchQuery);
     }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery, handleSearch]);
+
+    return clearScheduledSearch;
+  }, [clearScheduledSearch, handleSearch, searchQuery]);
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "F2") { e.preventDefault(); searchRef.current?.focus(); }
-      if (e.key === "F4") { e.preventDefault(); if (items.length > 0) setShowPayment(true); }
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "F2") {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+      if (event.key === "F4" && items.length > 0) {
+        event.preventDefault();
+        setShowPayment(true);
+      }
     };
+
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [items]);
+  }, [items.length]);
 
-  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") { e.preventDefault(); handleSearch(searchQuery); }
+  const handleSearchKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void handleSearch(searchQuery, { immediate: true });
+    }
   };
+
+  const resetOrderDraft = useCallback(() => {
+    setActiveOrder(null);
+    setOrderRef("");
+    setOrderNotes("");
+    setShowOrderRef(false);
+  }, []);
 
   const handlePaymentComplete = (sale: Sale) => {
     setLastSale(sale);
     clear();
-    setActiveOrder(null);
-    setOrderRef("");
+    resetOrderDraft();
     setShowPayment(false);
     toast.success(`Venta #${sale.sale_number} completada`);
     searchRef.current?.focus();
   };
 
-  // Load a comanda into the cart
   const handleLoadOrder = (order: Order, cartItems: CartItem[]) => {
     clear();
-    cartItems.forEach((ci) => addItem(ci.product, ci.quantity));
+    cartItems.forEach((cartItem) => addItem(cartItem.product, cartItem.quantity));
     setActiveOrder(order);
     setOrderRef(order.reference ?? "");
+    setOrderNotes(order.notes ?? "");
+    setShowOrderRef(false);
   };
 
-  // Save (create or update) the current cart as a comanda
   const handleSaveOrder = async () => {
-    if (items.length === 0) { toast.error("El carrito está vacío"); return; }
-    if (!register) { toast.error("Sin caja seleccionada"); return; }
+    if (items.length === 0) {
+      toast.error("El carrito esta vacio");
+      return;
+    }
+    if (!register) {
+      toast.error("Sin caja seleccionada");
+      return;
+    }
+
     setSavingOrder(true);
     try {
       const payload = {
         register_id: register.id,
         seller_id: user?.id ?? null,
         reference: orderRef.trim() || null,
-        items: items.map((i) => ({ product_id: i.product.id, quantity: i.quantity })),
+        notes: orderNotes.trim() || null,
+        items: items.map((item) => ({ product_id: item.product.id, quantity: item.quantity })),
       };
 
       let savedOrder: Order;
       if (activeOrder) {
-        // Update existing open order
         const { data } = await api.patch<Order>(`/orders/${activeOrder.id}`, {
           items: payload.items,
           reference: payload.reference,
+          notes: payload.notes,
         });
         savedOrder = data;
         toast.success(`Comanda #${savedOrder.order_number} actualizada`);
       } else {
-        // Create new order
         const { data } = await api.post<Order>("/orders/", payload);
         savedOrder = data;
         toast.success(`Comanda #${savedOrder.order_number} guardada`);
       }
-      setActiveOrder(savedOrder);
-      setShowOrderRef(false);
 
-      // Auto-print if printer is configured
-      if (window.electronAPI) {
-        const printerName = getSavedPrinterName();
-        if (printerName) {
-          const content = buildOrderContent(savedOrder);
-          await window.electronAPI.printReceipt({ content, printerName });
-        }
-      }
+      setActiveOrder(savedOrder);
+      setOrderRef(savedOrder.reference ?? "");
+      setOrderNotes(savedOrder.notes ?? "");
+      setShowOrderRef(false);
+      setPreviewOrder(savedOrder);
     } catch {
       toast.error("Error guardando comanda");
     } finally {
@@ -178,28 +240,20 @@ export default function POSPage() {
     }
   };
 
-  const handleReprintOrder = async () => {
+  const handleReprintOrder = () => {
     if (!activeOrder) return;
-    if (!window.electronAPI) { toast.error("Impresión solo disponible en app de escritorio"); return; }
-    const printerName = getSavedPrinterName();
-    if (!printerName) { toast.error("Configura una impresora en Configuración"); return; }
-    const content = buildOrderContent(activeOrder);
-    const result = await window.electronAPI.printReceipt({ content, printerName });
-    if (result.success) toast.success("Comanda impresa");
-    else toast.error(`Error: ${result.error}`);
+    setPreviewOrder(activeOrder);
   };
 
   const handleClearActiveOrder = () => {
-    setActiveOrder(null);
-    setOrderRef("");
     clear();
+    resetOrderDraft();
   };
 
   const showFavorites = searchResults.length === 0;
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">
-      {/* Header */}
       <header className="bg-white border-b px-4 py-2 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
           <h1 className="font-bold text-lg text-blue-600">MiniMarket POS</h1>
@@ -228,19 +282,17 @@ export default function POSPage() {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left: Search + Favorites */}
         <div className="flex-1 flex flex-col p-4 overflow-y-auto">
-          {/* Search bar */}
           <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
             <input
               ref={searchRef}
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(event) => setSearchQuery(event.target.value)}
               onKeyDown={handleSearchKeyDown}
               className="w-full pl-10 pr-10 py-3 border-2 border-gray-200 rounded-xl text-lg focus:border-blue-500 focus:outline-none"
-              placeholder="Escanear código o buscar producto... (F2)"
+              placeholder="Escanear codigo o buscar producto... (F2)"
               autoFocus
             />
             {searchQuery && (
@@ -253,18 +305,18 @@ export default function POSPage() {
             )}
           </div>
 
-          {/* Search results */}
           {searchResults.length > 0 && (
             <div className="bg-white rounded-xl border shadow-sm mb-4 max-h-72 overflow-y-auto">
               {searchResults.map((product) => {
                 const reserved = items
-                  .filter((i) => i.product.id === product.id)
-                  .reduce((sum, i) => sum + i.quantity, 0);
+                  .filter((item) => item.product.id === product.id)
+                  .reduce((sum, item) => sum + item.quantity, 0);
                 const remaining = product.stock - reserved;
                 const outOfStock = remaining <= 0;
                 const displayPrice = product.is_on_offer && product.discount_price
                   ? product.discount_price
                   : product.sell_price;
+
                 return (
                   <div key={product.id} className="border-b last:border-0">
                     <div className="flex items-center justify-between px-4 py-2.5">
@@ -302,7 +354,8 @@ export default function POSPage() {
                         <button
                           onClick={() => {
                             tryAddItem(product);
-                            setSearchQuery(""); setSearchResults([]);
+                            setSearchQuery("");
+                            setSearchResults([]);
                             searchRef.current?.focus();
                           }}
                           disabled={outOfStock}
@@ -318,15 +371,10 @@ export default function POSPage() {
             </div>
           )}
 
-          {/* Favorites panel — visible when no search results */}
-          {showFavorites && (
-            <FavoritesPanel onProductClick={tryAddItem} />
-          )}
+          {showFavorites && <FavoritesPanel onProductClick={tryAddItem} />}
         </div>
 
-        {/* Right: Cart */}
         <div className="w-[420px] bg-white border-l flex flex-col">
-          {/* Active order banner */}
           {activeOrder && (
             <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm text-blue-700">
@@ -342,7 +390,7 @@ export default function POSPage() {
                 <button
                   onClick={handleReprintOrder}
                   className="text-blue-500 hover:text-blue-700 p-1"
-                  title="Reimprimir comanda"
+                  title="Ver comanda"
                 >
                   <Printer size={14} />
                 </button>
@@ -361,15 +409,16 @@ export default function POSPage() {
             <div className="flex items-center justify-between">
               <h2 className="font-bold text-gray-800 text-lg">Carrito</h2>
               {items.length > 0 && (
-                <button onClick={() => { clear(); setActiveOrder(null); }}
-                  className="text-red-500 hover:text-red-600 text-sm flex items-center gap-1">
+                <button
+                  onClick={handleClearActiveOrder}
+                  className="text-red-500 hover:text-red-600 text-sm flex items-center gap-1"
+                >
                   <Trash2 size={14} /> Limpiar
                 </button>
               )}
             </div>
           </div>
 
-          {/* Cart items */}
           <div className="flex-1 overflow-y-auto">
             {items.length === 0 ? (
               <div className="flex items-center justify-center h-full text-gray-400">
@@ -379,10 +428,11 @@ export default function POSPage() {
               <div className="divide-y">
                 {items.map((item) => {
                   const reservedForOthers = items
-                    .filter((i) => i.product.id === item.product.id && i.cartKey !== item.cartKey)
-                    .reduce((sum, i) => sum + i.quantity, 0);
+                    .filter((other) => other.product.id === item.product.id && other.cartKey !== item.cartKey)
+                    .reduce((sum, other) => sum + other.quantity, 0);
                   const remaining = item.product.stock - reservedForOthers - item.quantity;
                   const atLimit = item.quantity + 1 > item.product.stock - reservedForOthers;
+
                   return (
                     <div key={item.cartKey} className="p-3 hover:bg-gray-50">
                       <div className="flex justify-between items-start mb-1">
@@ -399,6 +449,7 @@ export default function POSPage() {
                           <X size={16} />
                         </button>
                       </div>
+
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <button
@@ -411,7 +462,7 @@ export default function POSPage() {
                           <button
                             onClick={() => {
                               const ok = updateQuantity(item.cartKey, item.quantity + 1);
-                              if (!ok) toast.error(`Stock insuficiente`);
+                              if (!ok) toast.error("Stock insuficiente");
                             }}
                             disabled={atLimit}
                             className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg"
@@ -431,6 +482,7 @@ export default function POSPage() {
                           <p className="font-bold text-gray-800">{formatCLP(item.subtotal)}</p>
                         </div>
                       </div>
+
                       <div className="mt-1">
                         <StockBadge remaining={remaining} minStock={item.product.min_stock} />
                       </div>
@@ -441,34 +493,60 @@ export default function POSPage() {
             )}
           </div>
 
-          {/* Cart footer */}
           <div className="border-t p-4 space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Total</span>
               <span className="text-3xl font-bold text-gray-800">{formatCLP(total())}</span>
             </div>
 
-            {/* Save as comanda */}
             {showOrderRef ? (
-              <div className="flex gap-2">
+              <div className="space-y-2">
                 <input
                   value={orderRef}
-                  onChange={(e) => setOrderRef(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleSaveOrder(); if (e.key === "Escape") setShowOrderRef(false); }}
+                  onChange={(event) => setOrderRef(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void handleSaveOrder();
+                    }
+                    if (event.key === "Escape") setShowOrderRef(false);
+                  }}
                   placeholder='Referencia opcional (ej: "Mesa 3")'
-                  className="flex-1 border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
                   autoFocus
                 />
-                <button
-                  onClick={handleSaveOrder}
-                  disabled={savingOrder || items.length === 0}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition"
-                >
-                  {savingOrder ? "..." : "OK"}
-                </button>
-                <button onClick={() => setShowOrderRef(false)} className="text-gray-400 hover:text-gray-600 px-2">
-                  <X size={16} />
-                </button>
+                <textarea
+                  value={orderNotes}
+                  onChange={(event) => setOrderNotes(event.target.value)}
+                  onKeyDown={(event) => {
+                    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                      event.preventDefault();
+                      void handleSaveOrder();
+                    }
+                    if (event.key === "Escape") setShowOrderRef(false);
+                  }}
+                  rows={3}
+                  placeholder="Comentarios de la comanda (sin hielo, llevar, etc.)"
+                  className="w-full border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-blue-500"
+                />
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-gray-400">Al guardar se abrira la vista previa de la comanda.</span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowOrderRef(false)}
+                      className="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={() => void handleSaveOrder()}
+                      disabled={savingOrder || items.length === 0}
+                      className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+                    >
+                      {savingOrder ? "..." : "Vista previa"}
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
               <button
@@ -495,7 +573,6 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* Modals */}
       {showPayment && (
         <PaymentModal
           total={total()}
@@ -515,6 +592,14 @@ export default function POSPage() {
           sellerName={user?.full_name}
           registerName={register?.name}
           onClose={() => setLastSale(null)}
+        />
+      )}
+
+      {previewOrder && (
+        <OrderPreviewModal
+          order={previewOrder}
+          registerName={register?.name}
+          onClose={() => setPreviewOrder(null)}
         />
       )}
 

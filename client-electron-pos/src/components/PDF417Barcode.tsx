@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import bwipjs from "bwip-js/browser";
+import { renderPdf417ToCanvas } from "@/utils/pdf417";
 
 interface Props {
   tedXml: string;
@@ -19,16 +19,8 @@ export default function PDF417Barcode({ tedXml, className, onDataUrl }: Props) {
   useEffect(() => {
     if (!canvasRef.current || !tedXml) return;
     try {
-      bwipjs.toCanvas(canvasRef.current, {
-        bcid: "pdf417",
-        text: tedXml,
-        scale: 2,
-        height: 10,
-        includetext: false,
-      });
-      if (onDataUrl) {
-        onDataUrl(canvasRef.current.toDataURL("image/png"));
-      }
+      const dataUrl = renderPdf417ToCanvas(canvasRef.current, tedXml);
+      if (onDataUrl && dataUrl) onDataUrl(dataUrl);
     } catch (err) {
       console.error("PDF417 render error:", err);
     }

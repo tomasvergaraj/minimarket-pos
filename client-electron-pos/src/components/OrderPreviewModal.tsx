@@ -1,26 +1,24 @@
 import { useCallback, useEffect } from "react";
-import type { Sale } from "@/types";
+import type { Order } from "@/types";
 import { Printer, Settings, X } from "lucide-react";
 import toast from "react-hot-toast";
-import { buildReceiptContent, buildReceiptHtml } from "@/services/printer";
+import { buildOrderContent, buildOrderHtml } from "@/services/printer";
 import { getSavedPrinterName } from "@/pages/SettingsPage";
 import { useNavigate } from "react-router-dom";
 
 interface Props {
-  sale: Sale;
   onClose: () => void;
-  sellerName?: string;
+  order: Order;
   registerName?: string;
 }
 
-export default function ReceiptPreviewModal({ sale, onClose, sellerName, registerName }: Props) {
+export default function OrderPreviewModal({ onClose, order, registerName }: Props) {
   const navigate = useNavigate();
   const printerName = getSavedPrinterName();
   const canPrint = !!window.electronAPI && !!printerName;
 
-  const receiptHtml = buildReceiptHtml(sale, {
+  const orderHtml = buildOrderHtml(order, {
     registerName,
-    sellerName,
   });
 
   const handlePrint = useCallback(async () => {
@@ -33,19 +31,18 @@ export default function ReceiptPreviewModal({ sale, onClose, sellerName, registe
       return;
     }
 
-    const content = buildReceiptContent(sale, {
+    const content = buildOrderContent(order, {
       registerName,
-      sellerName,
     });
     const result = await window.electronAPI.printReceipt({ content, printerName });
 
     if (result.success) {
-      toast.success("Ticket impreso");
+      toast.success("Comanda impresa");
       onClose();
     } else {
       toast.error(`Error al imprimir: ${result.error}`);
     }
-  }, [onClose, printerName, registerName, sale, sellerName]);
+  }, [onClose, order, printerName, registerName]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -55,7 +52,7 @@ export default function ReceiptPreviewModal({ sale, onClose, sellerName, registe
       }
       if (event.key === "Enter" && !event.repeat) {
         event.stopPropagation();
-        handlePrint();
+        void handlePrint();
       }
     };
 
@@ -69,11 +66,11 @@ export default function ReceiptPreviewModal({ sale, onClose, sellerName, registe
       onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
     >
       <div className="flex flex-col items-center gap-5 max-h-screen py-6 overflow-y-auto">
-        <div className="bg-white w-[18rem] shadow-2xl">
+        <div className="bg-white w-[22rem] shadow-2xl">
           <div className="h-2 bg-gray-100" />
           <div
             className="px-4 py-4"
-            dangerouslySetInnerHTML={{ __html: receiptHtml }}
+            dangerouslySetInnerHTML={{ __html: orderHtml }}
           />
           <div className="h-4 bg-gradient-to-b from-gray-50 to-transparent" />
         </div>
@@ -102,7 +99,7 @@ export default function ReceiptPreviewModal({ sale, onClose, sellerName, registe
               <span className="text-white/50 text-xs ml-1">(Esc)</span>
             </button>
             <button
-              onClick={handlePrint}
+              onClick={() => void handlePrint()}
               disabled={!canPrint}
               title={!canPrint ? "Configura una impresora en Ajustes" : undefined}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:opacity-60 text-white px-8 py-3 rounded-xl font-bold transition shadow-lg"

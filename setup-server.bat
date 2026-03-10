@@ -37,5 +37,9 @@ echo  Para iniciar el servidor:
 echo    cd server-fastapi
 echo    venv\Scripts\activate
 echo    python run.py
+echo.
+echo  Para dejarlo con arranque automatico en Windows:
+echo    cd server-fastapi
+echo    python install_service.py install
 echo ============================================
 pause

@@ -543,7 +543,6 @@ function Ensure-FirewallRule {
 
 function Ensure-AutostartTask {
     param(
-        [string]$PythonExe,
         [string]$ServerDir
     )
 
@@ -553,8 +552,11 @@ function Ensure-AutostartTask {
 
     Write-Step "Registering startup task"
     $taskName = "MiniMarketPOS-Server"
-    $serveScript = Join-Path $ServerDir "serve.py"
-    $taskCommand = "`"$PythonExe`" `"$serveScript`""
+    $launcher = Join-Path $ServerDir "start-service.cmd"
+    if (-not (Test-Path $launcher)) {
+        throw "Autostart launcher not found: $launcher"
+    }
+    $taskCommand = "cmd.exe /d /c `"$launcher`""
 
     schtasks /Create /F /SC ONSTART /RL HIGHEST /RU SYSTEM /TN $taskName /TR $taskCommand | Out-Null
     if ($LASTEXITCODE -ne 0) {
@@ -645,7 +647,7 @@ $venvPython = Ensure-Venv -PythonCommand $pythonCommand -ServerDir $serverDir
 Build-AdminWeb -RepoRoot $repoRoot -NodeDir $nodeDir
 Invoke-Bootstrap -PythonExe $venvPython -ServerDir $serverDir -DatabaseUrl $databaseUrl
 Ensure-FirewallRule -Port $ServerPort
-Ensure-AutostartTask -PythonExe $venvPython -ServerDir $serverDir
+Ensure-AutostartTask -ServerDir $serverDir
 
 Write-Host ""
 Write-Host "MiniMarket POS server installation completed." -ForegroundColor Green

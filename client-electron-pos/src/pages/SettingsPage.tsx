@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getServerUrl, setServerUrl } from "@/services/api";
 import toast from "react-hot-toast";
@@ -17,9 +17,12 @@ export default function SettingsPage() {
   const [loadingPrinters, setLoadingPrinters] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const navigate = useNavigate();
+  const detectedPrinterValue = printers.some((printer) => printer.name === selectedPrinter)
+    ? selectedPrinter
+    : "";
 
   useEffect(() => {
-    window.electronAPI?.isFullscreen?.().then((v) => setIsFullscreen(!!v));
+    window.electronAPI?.isFullscreen?.().then((value) => setIsFullscreen(!!value));
   }, []);
 
   const toggleFullscreen = async () => {
@@ -30,14 +33,15 @@ export default function SettingsPage() {
 
   const loadPrinters = async () => {
     if (!window.electronAPI?.getPrinters) return;
+
     setLoadingPrinters(true);
     try {
       const list = await window.electronAPI.getPrinters();
       setPrinters(list);
-      // Auto-select default if nothing saved
+
       if (!selectedPrinter) {
-        const def = list.find((p: PrinterInfo) => p.isDefault);
-        if (def) setSelectedPrinter(def.name);
+        const defaultPrinter = list.find((printer) => printer.isDefault);
+        if (defaultPrinter) setSelectedPrinter(defaultPrinter.name);
       }
     } catch {
       toast.error("No se pudo obtener la lista de impresoras");
@@ -52,21 +56,23 @@ export default function SettingsPage() {
 
   const handleSave = () => {
     setServerUrl(url);
-    localStorage.setItem(PRINTER_KEY, selectedPrinter);
-    toast.success("Configuración guardada");
+    localStorage.setItem(PRINTER_KEY, selectedPrinter.trim());
+    toast.success("Configuracion guardada");
   };
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-lg mx-auto">
-        <button onClick={() => navigate("/pos")} className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-6">
+        <button
+          onClick={() => navigate("/pos")}
+          className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-6"
+        >
           <ArrowLeft size={20} /> Volver al POS
         </button>
 
         <div className="bg-white rounded-xl shadow p-6 space-y-6">
-          <h2 className="text-xl font-bold text-gray-800">Configuración</h2>
+          <h2 className="text-xl font-bold text-gray-800">Configuracion</h2>
 
-          {/* Server URL */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">URL del Servidor</label>
             <input
@@ -79,13 +85,12 @@ export default function SettingsPage() {
             <p className="text-xs text-gray-500 mt-1">IP del PC servidor en la red local</p>
           </div>
 
-          {/* Printer selection */}
           {window.electronAPI?.getPrinters && (
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-sm font-medium text-gray-700">
                   <Printer size={14} className="inline mr-1" />
-                  Impresora térmica
+                  Impresora termica
                 </label>
                 <button
                   onClick={loadPrinters}
@@ -103,32 +108,49 @@ export default function SettingsPage() {
                 </p>
               ) : (
                 <select
-                  value={selectedPrinter}
+                  value={detectedPrinterValue}
                   onChange={(e) => setSelectedPrinter(e.target.value)}
                   className="w-full border rounded-lg px-4 py-2 text-sm"
                   disabled={loadingPrinters}
                 >
-                  <option value="">— Sin impresora (desactivado) —</option>
-                  {printers.map((p) => (
-                    <option key={p.name} value={p.name}>
-                      {p.displayName || p.name}
-                      {p.isDefault ? " (predeterminada)" : ""}
+                  <option value="">-- Sin impresora (desactivado) --</option>
+                  {printers.map((printer) => (
+                    <option key={printer.name} value={printer.name}>
+                      {printer.displayName || printer.name}
+                      {printer.description ? ` - ${printer.description}` : ""}
+                      {printer.isDefault ? " (predeterminada)" : ""}
                     </option>
                   ))}
                 </select>
               )}
+
+              <input
+                type="text"
+                value={selectedPrinter}
+                onChange={(e) => setSelectedPrinter(e.target.value)}
+                className="w-full border rounded-lg px-4 py-2 text-sm mt-2"
+                placeholder="Nombre exacto en Windows (ej: NII W2K203DPI)"
+                autoComplete="off"
+                spellCheck={false}
+              />
+
+              {selectedPrinter && !detectedPrinterValue && (
+                <p className="text-xs text-amber-600 mt-1">
+                  El nombre guardado no aparece en la lista detectada. Se intentara usar exactamente ese nombre al imprimir.
+                </p>
+              )}
+
               <p className="text-xs text-gray-500 mt-1">
-                Selecciona la impresora térmica ESC/POS conectada
+                Selecciona la impresora instalada en Windows o escribe su nombre exacto si no aparece.
               </p>
             </div>
           )}
 
-          {/* Pantalla completa */}
           {window.electronAPI?.setFullscreen && (
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-700">Pantalla completa</p>
-                <p className="text-xs text-gray-500">También puedes usar F11</p>
+                <p className="text-xs text-gray-500">Tambien puedes usar F11</p>
               </div>
               <button
                 onClick={toggleFullscreen}
@@ -140,7 +162,10 @@ export default function SettingsPage() {
             </div>
           )}
 
-          <button onClick={handleSave} className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium">
+          <button
+            onClick={handleSave}
+            className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium"
+          >
             Guardar
           </button>
         </div>

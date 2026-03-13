@@ -101,6 +101,13 @@ export interface User {
   created_at: string;
 }
 
+export interface AuthSession {
+  access_token: string;
+  token_type: "bearer";
+  expires_in: number;
+  user: User;
+}
+
 export interface OrderItem {
   id: string;
   product_id: string;

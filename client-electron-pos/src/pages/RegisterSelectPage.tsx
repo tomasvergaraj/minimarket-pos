@@ -1,12 +1,20 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import { Monitor, LogOut } from "lucide-react";
+import toast from "react-hot-toast";
 
 export default function RegisterSelectPage() {
   const { registers, fetchRegisters, selectRegister, user, logout } = useAuthStore();
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
-    fetchRegisters();
+    fetchRegisters()
+      .then(() => setLoadError(""))
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : "No se pudo validar la licencia";
+        setLoadError(message);
+        toast.error(message);
+      });
   }, [fetchRegisters]);
 
   return (
@@ -23,6 +31,12 @@ export default function RegisterSelectPage() {
         </div>
 
         <div className="space-y-3">
+          {loadError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {loadError}
+            </div>
+          )}
+
           {registers.map((reg) => (
             <button
               key={reg.id}

@@ -5,6 +5,7 @@ from app.models.kardex import KardexEntry
 from app.models.user import User
 from app.models.sii_folio import SIIFolioCounter
 from app.models.order import Order, OrderItem
+from app.models.license_state import LicenseState
 
 __all__ = [
     "Product", "Sale", "SaleItem",
@@ -12,4 +13,5 @@ __all__ = [
     "KardexEntry", "User",
     "SIIFolioCounter",
     "Order", "OrderItem",
+    "LicenseState",
 ]

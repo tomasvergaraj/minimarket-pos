@@ -3,9 +3,11 @@ from datetime import date, datetime, time, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_admin
+from app.api.deps import get_current_user, require_admin, require_operational_license
 from app.db.session import get_db
 from app.models.cash_register import CashRegister, CashSession, SessionStatus
+from app.models.user import User
+from app.services.license_service import LicenseError, ensure_register_capacity
 from app.schemas.cash_register import (
     CashRegisterCreate, CashRegisterOut,
     CashSessionOpen, CashSessionClose, CashSessionOut, CashSessionListResponse,
@@ -16,13 +18,27 @@ router = APIRouter(prefix="/cash", tags=["cash"])
 
 # --- Registers ---
 
-@router.get("/registers", response_model=list[CashRegisterOut])
+@router.get(
+    "/registers",
+    response_model=list[CashRegisterOut],
+    dependencies=[Depends(get_current_user), Depends(require_operational_license)],
+)
 def list_registers(db: Session = Depends(get_db)):
     return db.query(CashRegister).filter(CashRegister.is_active == True).all()
 
 
-@router.post("/registers", response_model=CashRegisterOut, status_code=201)
+@router.post(
+    "/registers",
+    response_model=CashRegisterOut,
+    status_code=201,
+    dependencies=[Depends(require_admin), Depends(require_operational_license)],
+)
 def create_register(data: CashRegisterCreate, db: Session = Depends(get_db)):
+    try:
+        ensure_register_capacity(db)
+    except LicenseError as exc:
+        raise HTTPException(403, {"code": exc.code, "message": exc.message}) from exc
+
     reg = CashRegister(name=data.name)
     db.add(reg)
     db.commit()
@@ -32,8 +48,17 @@ def create_register(data: CashRegisterCreate, db: Session = Depends(get_db)):
 
 # --- Sessions ---
 
-@router.post("/sessions/open", response_model=CashSessionOut, status_code=201)
-def open_session(data: CashSessionOpen, db: Session = Depends(get_db)):
+@router.post(
+    "/sessions/open",
+    response_model=CashSessionOut,
+    status_code=201,
+    dependencies=[Depends(require_operational_license)],
+)
+def open_session(
+    data: CashSessionOpen,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     existing = (
         db.query(CashSession)
         .filter(CashSession.register_id == data.register_id, CashSession.status == SessionStatus.OPEN)
@@ -44,7 +69,7 @@ def open_session(data: CashSessionOpen, db: Session = Depends(get_db)):
 
     session = CashSession(
         register_id=data.register_id,
-        user_id=data.user_id,
+        user_id=current_user.id,
         opening_amount=data.opening_amount,
         status=SessionStatus.OPEN,
     )
@@ -54,13 +79,24 @@ def open_session(data: CashSessionOpen, db: Session = Depends(get_db)):
     return session
 
 
-@router.post("/sessions/{session_id}/close", response_model=CashSessionOut)
-def close_session(session_id: str, data: CashSessionClose, db: Session = Depends(get_db)):
+@router.post(
+    "/sessions/{session_id}/close",
+    response_model=CashSessionOut,
+    dependencies=[Depends(require_operational_license)],
+)
+def close_session(
+    session_id: str,
+    data: CashSessionClose,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     session = db.query(CashSession).filter(CashSession.id == session_id).with_for_update().first()
     if not session:
         raise HTTPException(404, "Session not found")
     if session.status != SessionStatus.OPEN:
         raise HTTPException(400, "Session is already closed")
+    if session.user_id and session.user_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(403, "Session belongs to another user")
 
     expected = float(session.opening_amount) + float(session.total_cash_sales or 0)
     session.closing_amount = data.closing_amount
@@ -111,12 +147,20 @@ def list_sessions(
     }
 
 
-@router.get("/sessions/active", response_model=list[CashSessionOut])
+@router.get(
+    "/sessions/active",
+    response_model=list[CashSessionOut],
+    dependencies=[Depends(get_current_user), Depends(require_operational_license)],
+)
 def list_active_sessions(db: Session = Depends(get_db)):
     return db.query(CashSession).filter(CashSession.status == SessionStatus.OPEN).all()
 
 
-@router.get("/sessions/{session_id}", response_model=CashSessionOut)
+@router.get(
+    "/sessions/{session_id}",
+    response_model=CashSessionOut,
+    dependencies=[Depends(get_current_user), Depends(require_operational_license)],
+)
 def get_session(session_id: str, db: Session = Depends(get_db)):
     session = db.query(CashSession).filter(CashSession.id == session_id).first()
     if not session:

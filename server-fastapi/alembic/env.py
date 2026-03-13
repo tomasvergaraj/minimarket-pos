@@ -8,7 +8,7 @@ if config.config_file_name is not None:
 
 # Import all models so Alembic can detect them
 from app.db.base import Base
-from app.models import Product, Sale, SaleItem, CashRegister, CashSession, KardexEntry, User
+from app.models import Product, Sale, SaleItem, CashRegister, CashSession, KardexEntry, User, LicenseState
 from app.core.config import settings
 
 target_metadata = Base.metadata

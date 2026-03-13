@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Boolean, DateTime
+
+from sqlalchemy import Boolean, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -11,7 +12,7 @@ class User(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-    pin: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)  # PIN rápido para caja
+    pin: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)  # HMAC del PIN
     full_name: Mapped[str] = mapped_column(String(100), nullable=False)
     role: Mapped[str] = mapped_column(String(20), default="cashier")  # admin, cashier
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

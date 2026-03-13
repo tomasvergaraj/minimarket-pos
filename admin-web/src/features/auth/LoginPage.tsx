@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Store, Loader2, AlertCircle, Delete } from 'lucide-react'
+import { Loader2, AlertCircle, Delete } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import clsx from 'clsx'
+import nexoIconUrl from '../../assets/nexo-icon.svg'
 
 export default function LoginPage() {
   const [pin, setPin] = useState('')
@@ -47,11 +48,9 @@ export default function LoginPage() {
       <div className="w-full max-w-xs animate-slide-up">
         {/* Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-primary-600 rounded-xl mb-4 shadow-sm">
-            <Store className="w-6 h-6 text-white" />
-          </div>
+          <img src={nexoIconUrl} alt="Nexo" className="w-14 h-14 mx-auto mb-4" />
           <h1 className="text-lg font-semibold text-text-primary tracking-tight">
-            MiniMarket Admin
+            Nexo Admin
           </h1>
           <p className="text-[13px] text-text-muted mt-1">
             Ingrese su PIN de administrador
@@ -142,7 +141,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-caption text-text-muted text-center mt-5">
-          MiniMarket POS v1.0
+          Nexo
         </p>
       </div>
     </div>

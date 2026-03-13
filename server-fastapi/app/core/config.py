@@ -18,9 +18,13 @@ class Settings(BaseSettings):
     SERVER_HOST: str = "0.0.0.0"
     SERVER_PORT: int = 8000
     SECRET_KEY: str = "change-me-in-production"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
+    LICENSE_TRIAL_DAYS: int = 30
+    LICENSE_CLOCK_SKEW_MINUTES: int = 90
+    LICENSE_PUBLIC_KEY_PATH: str = ""
     SUPABASE_URL: str = ""
     SUPABASE_KEY: str = ""
-    STORE_NAME: str = "MiniMarket POS"
+    STORE_NAME: str = "Nexo"
     STORE_RUT: str = ""
     STORE_ADDRESS: str = ""
     CORS_ORIGINS: str = "http://localhost:5174,http://127.0.0.1:5174"

@@ -26,6 +26,7 @@ import ReceiptPreviewModal from "@/components/ReceiptPreviewModal";
 import OrderPreviewModal from "@/components/OrderPreviewModal";
 import FavoritesPanel from "@/components/FavoritesPanel";
 import OrdersModal from "@/components/OrdersModal";
+import nexoIconUrl from "../assets/nexo-icon.svg";
 
 function stockColor(stock: number, minStock: number) {
   if (stock <= 0) return "text-red-600 font-semibold";
@@ -207,7 +208,6 @@ export default function POSPage() {
     try {
       const payload = {
         register_id: register.id,
-        seller_id: user?.id ?? null,
         reference: orderRef.trim() || null,
         notes: orderNotes.trim() || null,
         items: items.map((item) => ({ product_id: item.product.id, quantity: item.quantity })),
@@ -256,7 +256,10 @@ export default function POSPage() {
     <div className="h-screen flex flex-col bg-gray-100">
       <header className="bg-white border-b px-4 py-2 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
-          <h1 className="font-bold text-lg text-blue-600">MiniMarket POS</h1>
+          <div className="flex items-center gap-3">
+            <img src={nexoIconUrl} alt="Nexo" className="w-8 h-8 rounded-lg" />
+            <h1 className="font-bold text-lg text-blue-600">Nexo</h1>
+          </div>
           <span className="text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
             {register?.name}
           </span>

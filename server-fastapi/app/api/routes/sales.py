@@ -3,9 +3,10 @@ from datetime import date, datetime, time, timedelta
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_admin
+from app.api.deps import get_current_user, require_admin, require_operational_license
 from app.db.session import get_db
 from app.models.sale import Sale, SaleStatus
+from app.models.user import User
 from app.schemas.sale import SaleCreate, SaleOut, SaleListResponse
 from app.services.sale_service import create_sale, void_sale
 from app.tax.sii.service import background_upload
@@ -13,14 +14,21 @@ from app.tax.sii.service import background_upload
 router = APIRouter(prefix="/sales", tags=["sales"])
 
 
-@router.post("/", response_model=SaleOut, status_code=201)
+@router.post(
+    "/",
+    response_model=SaleOut,
+    status_code=201,
+    dependencies=[Depends(require_operational_license)],
+)
 def post_sale(
     data: SaleCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     try:
-        sale, dte_bytes = create_sale(db, data)
+        sale_data = data.model_copy(update={"seller_id": current_user.id})
+        sale, dte_bytes = create_sale(db, sale_data)
         if dte_bytes is not None:
             background_tasks.add_task(background_upload, sale.id, dte_bytes)
         return sale
@@ -28,7 +36,7 @@ def post_sale(
         raise HTTPException(400, str(e))
 
 
-@router.get("/number/{sale_number}", response_model=SaleOut)
+@router.get("/number/{sale_number}", response_model=SaleOut, dependencies=[Depends(get_current_user)])
 def get_sale_by_number(sale_number: int, db: Session = Depends(get_db)):
     sale = db.query(Sale).filter(Sale.sale_number == sale_number).first()
     if not sale:
@@ -36,7 +44,7 @@ def get_sale_by_number(sale_number: int, db: Session = Depends(get_db)):
     return sale
 
 
-@router.get("/{sale_id}", response_model=SaleOut)
+@router.get("/{sale_id}", response_model=SaleOut, dependencies=[Depends(get_current_user)])
 def get_sale(sale_id: str, db: Session = Depends(get_db)):
     sale = db.query(Sale).filter(Sale.id == sale_id).first()
     if not sale:
@@ -82,7 +90,7 @@ def list_sales(
     }
 
 
-@router.post("/{sale_id}/void", response_model=SaleOut)
+@router.post("/{sale_id}/void", response_model=SaleOut, dependencies=[Depends(require_admin)])
 def post_void_sale(sale_id: str, db: Session = Depends(get_db)):
     try:
         sale = void_sale(db, sale_id)

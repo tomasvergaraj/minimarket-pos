@@ -11,3 +11,7 @@ dist-electron/
 *.exe
 *.db
 .DS_Store
+
+# Local secrets and issued licenses
+secrets/
+licenses/

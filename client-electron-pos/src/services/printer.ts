@@ -22,7 +22,6 @@ export interface ReceiptBuildOptions {
 export interface OrderBuildOptions {
   registerName?: string;
   showBlankNotesBox?: boolean;
-  storeName?: string;
 }
 
 export interface ReceiptLayout {
@@ -127,7 +126,7 @@ export function buildReceiptLayout(sale: Sale, options: ReceiptBuildOptions = {}
     siiFolio: sale.sii_folio,
     siiStatusLabel: sale.sii_status ?? "PENDIENTE",
     showSiiSection,
-    storeName: options.storeName ?? "MINIMARKET POS",
+    storeName: options.storeName ?? "NEXO",
     taxAmount: sale.tax_amount,
     totalAmount: sale.total,
   };
@@ -211,7 +210,6 @@ export function buildReceiptHtml(sale: Sale, options: ReceiptBuildOptions = {}) 
 }
 
 export function buildOrderHtml(order: Order, options: OrderBuildOptions = {}) {
-  const storeName = options.storeName ?? "MINIMARKET POS";
   const registerName = options.registerName?.trim() || "";
   const showBlankNotesBox = options.showBlankNotesBox ?? true;
   const notes = order.notes?.trim() || "";
@@ -238,10 +236,7 @@ export function buildOrderHtml(order: Order, options: OrderBuildOptions = {}) {
 
   return `
     <div style="width:100%;box-sizing:border-box;padding:2px 4px 14px;font-family:Arial,Helvetica,sans-serif;color:${RECEIPT_COLOR_PRIMARY};-webkit-print-color-adjust:exact;print-color-adjust:exact;page-break-inside:avoid;break-inside:avoid-page;">
-      <div style="text-align:center;">
-        <div style="font-size:18px;font-weight:800;letter-spacing:0.04em;">${escapeHtml(storeName)}</div>
-        ${registerName ? `<div style="font-size:12px;font-weight:700;color:${RECEIPT_COLOR_MUTED};margin-top:4px;">${escapeHtml(registerName)}</div>` : ""}
-      </div>
+      ${registerName ? `<div style="text-align:center;font-size:12px;font-weight:700;color:${RECEIPT_COLOR_MUTED};margin-bottom:2px;">${escapeHtml(registerName)}</div>` : ""}
 
       <div style="border-top:2px dashed ${RECEIPT_COLOR_SEPARATOR};margin:10px 0;"></div>
 
@@ -301,4 +296,34 @@ export function buildReceiptContent(sale: Sale, options: ReceiptBuildOptions = {
       },
     },
   ];
+}
+
+export function buildReceiptPdfFileName(sale: Sale) {
+  if (sale.sii_folio != null) {
+    return `boleta-sii-${sale.sii_folio}.pdf`;
+  }
+
+  return `boleta-${sale.sale_number}.pdf`;
+}
+
+export function buildReceiptWhatsAppText(sale: Sale, options: ReceiptBuildOptions = {}) {
+  const layout = buildReceiptLayout(sale, options);
+
+  const lines = [
+    layout.storeName,
+    layout.isDte ? `Boleta electronica ${layout.saleNumberLabel}` : layout.saleNumberLabel,
+    layout.createdAtLabel,
+    "",
+    ...layout.items.map((item) => `${item.quantity} x ${item.product_name} - ${formatCLP(item.subtotal)}`),
+    "",
+    `Total: ${formatCLP(layout.totalAmount)}`,
+    `Pago: ${layout.paymentMethodLabel}`,
+    ...(layout.cashAmount > 0 ? [`Efectivo: ${formatCLP(layout.cashAmount)}`] : []),
+    ...(layout.cardAmount > 0 ? [`Tarjeta: ${formatCLP(layout.cardAmount)}`] : []),
+    ...(layout.changeAmount > 0 ? [`Vuelto: ${formatCLP(layout.changeAmount)}`] : []),
+    ...(layout.siiFolio != null ? [`Folio SII: ${layout.siiFolio}`] : []),
+    ...(sale.sii_status ? [`SII: ${sale.sii_status}`] : []),
+  ];
+
+  return lines.join("\n");
 }

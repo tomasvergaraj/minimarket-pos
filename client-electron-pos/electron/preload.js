@@ -3,6 +3,8 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("electronAPI", {
   getPrinters: () => ipcRenderer.invoke("get-printers"),
   printReceipt: (data) => ipcRenderer.invoke("print-receipt", data),
+  saveReceiptPdf: (data) => ipcRenderer.invoke("save-receipt-pdf", data),
+  openWhatsApp: (data) => ipcRenderer.invoke("open-whatsapp", data),
   installUpdate: () => ipcRenderer.send("install-update"),
   getUpdateState: () => ipcRenderer.invoke("get-update-state"),
   onUpdateAvailable: (callback) =>

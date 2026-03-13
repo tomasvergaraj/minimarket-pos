@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_user, require_admin, require_operational_license
 from app.db.session import get_db
 from app.models.product import Product
 from app.schemas.product import ProductCreate, ProductUpdate, ProductOut
@@ -26,7 +27,11 @@ def _to_out(product: Product, db: Session) -> ProductOut:
     return out
 
 
-@router.get("/", response_model=list[ProductOut])
+@router.get(
+    "/",
+    response_model=list[ProductOut],
+    dependencies=[Depends(get_current_user), Depends(require_operational_license)],
+)
 def list_products(
     search: str | None = None,
     category: str | None = None,
@@ -50,7 +55,11 @@ def list_products(
     return [_to_out(p, db) for p in products]
 
 
-@router.get("/barcode/{barcode}", response_model=ProductOut)
+@router.get(
+    "/barcode/{barcode}",
+    response_model=ProductOut,
+    dependencies=[Depends(get_current_user), Depends(require_operational_license)],
+)
 def get_by_barcode(barcode: str, db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.barcode == barcode, Product.is_active == True).first()
     if not product:
@@ -58,7 +67,11 @@ def get_by_barcode(barcode: str, db: Session = Depends(get_db)):
     return _to_out(product, db)
 
 
-@router.get("/{product_id}", response_model=ProductOut)
+@router.get(
+    "/{product_id}",
+    response_model=ProductOut,
+    dependencies=[Depends(get_current_user), Depends(require_operational_license)],
+)
 def get_product(product_id: str, db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
@@ -66,7 +79,12 @@ def get_product(product_id: str, db: Session = Depends(get_db)):
     return _to_out(product, db)
 
 
-@router.post("/", response_model=ProductOut, status_code=201)
+@router.post(
+    "/",
+    response_model=ProductOut,
+    status_code=201,
+    dependencies=[Depends(require_admin), Depends(require_operational_license)],
+)
 def create_product(data: ProductCreate, db: Session = Depends(get_db)):
     dump = data.model_dump()
     if dump.get("is_pack"):
@@ -78,7 +96,11 @@ def create_product(data: ProductCreate, db: Session = Depends(get_db)):
     return _to_out(product, db)
 
 
-@router.put("/{product_id}", response_model=ProductOut)
+@router.put(
+    "/{product_id}",
+    response_model=ProductOut,
+    dependencies=[Depends(require_admin), Depends(require_operational_license)],
+)
 def update_product(product_id: str, data: ProductUpdate, db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
@@ -90,7 +112,10 @@ def update_product(product_id: str, data: ProductUpdate, db: Session = Depends(g
     return _to_out(product, db)
 
 
-@router.delete("/{product_id}")
+@router.delete(
+    "/{product_id}",
+    dependencies=[Depends(require_admin), Depends(require_operational_license)],
+)
 def delete_product(product_id: str, db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
@@ -100,7 +125,11 @@ def delete_product(product_id: str, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
-@router.get("/categories/list", response_model=list[str])
+@router.get(
+    "/categories/list",
+    response_model=list[str],
+    dependencies=[Depends(get_current_user), Depends(require_operational_license)],
+)
 def list_categories(db: Session = Depends(get_db)):
     rows = db.query(Product.category).filter(Product.category.isnot(None)).distinct().all()
     return [r[0] for r in rows]

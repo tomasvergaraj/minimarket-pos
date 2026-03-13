@@ -1,7 +1,8 @@
-const { app, BrowserWindow, ipcMain, globalShortcut } = require("electron");
+const { app, BrowserWindow, ipcMain, globalShortcut, dialog, shell } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
 const { execFile } = require("node:child_process");
+const fs = require("node:fs/promises");
 const path = require("path");
 const { promisify } = require("node:util");
 
@@ -16,6 +17,7 @@ const THERMAL_CONTENT_WIDTH_PX = 260;
 const THERMAL_PRINT_WINDOW_HEIGHT_PX = 1400;
 const THERMAL_PRINT_HEIGHT_PADDING_PX = 24;
 const THERMAL_MIN_PAGE_HEIGHT_PX = 220;
+const THERMAL_PAGE_WIDTH_INCHES = 3.15;
 
 let mainWindow;
 
@@ -202,6 +204,10 @@ function pxToMicrons(px) {
   return Math.ceil(px * 264.5833);
 }
 
+function pxToInches(px) {
+  return Number((px / 96).toFixed(3));
+}
+
 async function measurePrintableHeightPx(printWindow) {
   const script = `(() => {
     const root = document.getElementById("print-root");
@@ -228,7 +234,7 @@ function destroyWindow(windowToDestroy) {
   }
 }
 
-async function printHtmlContent({ content, printerName, copies = 1 }) {
+async function createPrintableWindow(content) {
   const html = buildPrintableHtml(content);
   const printWindow = new BrowserWindow({
     show: false,
@@ -249,6 +255,17 @@ async function printHtmlContent({ content, printerName, copies = 1 }) {
     );
 
     const heightPx = await measurePrintableHeightPx(printWindow);
+    return { printWindow, heightPx };
+  } catch (err) {
+    destroyWindow(printWindow);
+    throw err;
+  }
+}
+
+async function printHtmlContent({ content, printerName, copies = 1 }) {
+  const { printWindow, heightPx } = await createPrintableWindow(content);
+
+  try {
     const pageSize = {
       width: THERMAL_PAGE_WIDTH_MICRONS,
       height: pxToMicrons(heightPx),
@@ -286,6 +303,67 @@ async function printHtmlContent({ content, printerName, copies = 1 }) {
   }
 }
 
+function normalizePdfFileName(value) {
+  const baseName = String(value || "boleta")
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "")
+    .trim();
+
+  if (!baseName) return "boleta.pdf";
+  return baseName.toLowerCase().endsWith(".pdf") ? baseName : `${baseName}.pdf`;
+}
+
+async function savePdfFile({ content, defaultFileName }) {
+  const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+    title: "Guardar boleta como PDF",
+    defaultPath: path.join(app.getPath("documents"), normalizePdfFileName(defaultFileName)),
+    buttonLabel: "Guardar PDF",
+    filters: [{ name: "PDF", extensions: ["pdf"] }],
+  });
+
+  if (canceled || !filePath) {
+    return { success: false, canceled: true };
+  }
+
+  const { printWindow, heightPx } = await createPrintableWindow(content);
+
+  try {
+    const pdfBuffer = await printWindow.webContents.printToPDF({
+      printBackground: true,
+      pageSize: {
+        width: THERMAL_PAGE_WIDTH_INCHES,
+        height: pxToInches(heightPx),
+      },
+      margins: {
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+      },
+    });
+
+    await fs.writeFile(filePath, pdfBuffer);
+    return { success: true, filePath, canceled: false };
+  } finally {
+    destroyWindow(printWindow);
+  }
+}
+
+function normalizeWhatsAppPhone(phoneNumber) {
+  const digits = String(phoneNumber || "").replace(/\D+/g, "");
+  if (!digits) return "";
+  return digits.startsWith("+" ) ? digits : digits;
+}
+
+function buildWhatsAppUrl({ text, phoneNumber }) {
+  const message = String(text || "").trim();
+  const normalizedPhone = normalizeWhatsAppPhone(phoneNumber);
+  const baseUrl = normalizedPhone
+    ? `https://wa.me/${normalizedPhone}`
+    : "https://wa.me/";
+
+  return `${baseUrl}?text=${encodeURIComponent(message)}`;
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -297,7 +375,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
     },
-    title: `MiniMarket POS v${app.getVersion()}`,
+    title: `Nexo v${app.getVersion()}`,
     autoHideMenuBar: true,
   });
 
@@ -312,7 +390,7 @@ function createWindow() {
 
   // Reapply title after page load (HTML <title> would otherwise override it)
   mainWindow.webContents.on("did-finish-load", () => {
-    mainWindow.setTitle(`MiniMarket POS v${app.getVersion()}`);
+    mainWindow.setTitle(`Nexo v${app.getVersion()}`);
   });
 
 }
@@ -413,6 +491,35 @@ ipcMain.handle("print-receipt", async (_event, data) => {
   } catch (err) {
     const msg = err?.message ?? (typeof err === "string" ? err : JSON.stringify(err)) ?? "Error desconocido";
     log.error("print-receipt error:", err);
+    return { success: false, error: msg };
+  }
+});
+
+ipcMain.handle("save-receipt-pdf", async (_event, data) => {
+  try {
+    return await savePdfFile({
+      content: data.content,
+      defaultFileName: data.defaultFileName,
+    });
+  } catch (err) {
+    const msg = err?.message ?? (typeof err === "string" ? err : JSON.stringify(err)) ?? "Error desconocido";
+    log.error("save-receipt-pdf error:", err);
+    return { success: false, canceled: false, error: msg };
+  }
+});
+
+ipcMain.handle("open-whatsapp", async (_event, data) => {
+  try {
+    const url = buildWhatsAppUrl({
+      text: data.text,
+      phoneNumber: data.phoneNumber,
+    });
+
+    await shell.openExternal(url);
+    return { success: true, url };
+  } catch (err) {
+    const msg = err?.message ?? (typeof err === "string" ? err : JSON.stringify(err)) ?? "Error desconocido";
+    log.error("open-whatsapp error:", err);
     return { success: false, error: msg };
   }
 });

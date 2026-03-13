@@ -5,7 +5,12 @@ import {
   useCallback,
   type ReactNode,
 } from 'react'
-import type { User } from '../types'
+import type { StoredAdminSession, User } from '../types'
+import {
+  clearStoredAdminSession,
+  getStoredAdminSession,
+  setStoredAdminSession,
+} from '../lib/api'
 import { loginWithPin as loginService } from '../lib/services'
 
 interface AuthContextValue {
@@ -19,34 +24,36 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('admin_user')
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as User
-        if (parsed.role === 'admin') return parsed
-      } catch {
-        // corrupted data
-      }
-      localStorage.removeItem('admin_user')
+  const [session, setSession] = useState<StoredAdminSession | null>(() => {
+    const saved = getStoredAdminSession()
+    if (!saved) return null
+    if (saved.user.role !== 'admin' || Date.parse(saved.expires_at) <= Date.now()) {
+      clearStoredAdminSession()
+      return null
     }
-    return null
+    return saved
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const user = session?.user ?? null
 
   const loginWithPin = useCallback(async (pin: string) => {
     setLoading(true)
     setError(null)
     try {
-      const loggedUser = await loginService(pin)
+      const authSession = await loginService(pin)
+      const loggedUser = authSession.user
 
       if (loggedUser.role !== 'admin') {
         throw new Error('Acceso denegado: se requiere rol de administrador')
       }
 
-      localStorage.setItem('admin_user', JSON.stringify(loggedUser))
-      setUser(loggedUser)
+      const storedSession: StoredAdminSession = {
+        ...authSession,
+        expires_at: new Date(Date.now() + authSession.expires_in * 1000).toISOString(),
+      }
+      setStoredAdminSession(storedSession)
+      setSession(storedSession)
     } catch (err) {
       const msg =
         err instanceof Error
@@ -60,8 +67,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(() => {
-    localStorage.removeItem('admin_user')
-    setUser(null)
+    clearStoredAdminSession()
+    setSession(null)
     setError(null)
   }, [])
 

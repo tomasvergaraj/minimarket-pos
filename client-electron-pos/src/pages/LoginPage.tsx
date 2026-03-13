@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import toast from "react-hot-toast";
 import { getServerUrl, setServerUrl } from "@/services/api";
+import nexoIconUrl from "../assets/nexo-icon.svg";
 
 export default function LoginPage() {
   const [pin, setPin] = useState("");
@@ -85,9 +86,10 @@ export default function LoginPage() {
   }, [handleBackspace, handleClear, handleDigit, handleLogin]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center">
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-blue-500 flex items-center justify-center">
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-96">
-        <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">MiniMarket POS</h1>
+        <img src={nexoIconUrl} alt="Nexo" className="w-16 h-16 mx-auto mb-4" />
+        <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">Nexo</h1>
         <p className="text-center text-gray-500 mb-6">Ingrese su PIN</p>
 
         <div className="bg-gray-100 rounded-lg p-4 mb-6 text-center">

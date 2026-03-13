@@ -4,9 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+from app.api.deps import get_current_user, require_operational_license
 from app.db.session import get_db
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.product import Product
+from app.models.user import User
 from app.schemas.order import OrderCreate, OrderPatch, OrderOut
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -34,12 +36,21 @@ def _build_items(db: Session, items_in: list) -> list[OrderItem]:
     return items
 
 
-@router.post("/", response_model=OrderOut, status_code=201)
-def create_order(data: OrderCreate, db: Session = Depends(get_db)):
+@router.post(
+    "/",
+    response_model=OrderOut,
+    status_code=201,
+    dependencies=[Depends(require_operational_license)],
+)
+def create_order(
+    data: OrderCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     order = Order(
         order_number=_next_order_number(db),
         register_id=data.register_id,
-        seller_id=data.seller_id,
+        seller_id=current_user.id,
         reference=data.reference,
         notes=data.notes,
         status=OrderStatus.OPEN,
@@ -52,7 +63,11 @@ def create_order(data: OrderCreate, db: Session = Depends(get_db)):
 
 
 # NOTE: /number/{n} must be defined BEFORE /{order_id} to avoid routing conflicts
-@router.get("/number/{order_number}", response_model=OrderOut)
+@router.get(
+    "/number/{order_number}",
+    response_model=OrderOut,
+    dependencies=[Depends(get_current_user), Depends(require_operational_license)],
+)
 def get_order_by_number(order_number: int, db: Session = Depends(get_db)):
     order = db.query(Order).filter(Order.order_number == order_number).first()
     if not order:
@@ -60,7 +75,11 @@ def get_order_by_number(order_number: int, db: Session = Depends(get_db)):
     return order
 
 
-@router.get("/", response_model=list[OrderOut])
+@router.get(
+    "/",
+    response_model=list[OrderOut],
+    dependencies=[Depends(get_current_user), Depends(require_operational_license)],
+)
 def list_orders(
     status: str | None = Query(default=None),
     register_id: str | None = Query(default=None),
@@ -76,7 +95,11 @@ def list_orders(
     return q.order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
 
 
-@router.get("/{order_id}", response_model=OrderOut)
+@router.get(
+    "/{order_id}",
+    response_model=OrderOut,
+    dependencies=[Depends(get_current_user), Depends(require_operational_license)],
+)
 def get_order(order_id: str, db: Session = Depends(get_db)):
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
@@ -84,7 +107,11 @@ def get_order(order_id: str, db: Session = Depends(get_db)):
     return order
 
 
-@router.patch("/{order_id}", response_model=OrderOut)
+@router.patch(
+    "/{order_id}",
+    response_model=OrderOut,
+    dependencies=[Depends(get_current_user), Depends(require_operational_license)],
+)
 def patch_order(order_id: str, data: OrderPatch, db: Session = Depends(get_db)):
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
@@ -105,7 +132,11 @@ def patch_order(order_id: str, data: OrderPatch, db: Session = Depends(get_db)):
     return order
 
 
-@router.post("/{order_id}/cancel", response_model=OrderOut)
+@router.post(
+    "/{order_id}/cancel",
+    response_model=OrderOut,
+    dependencies=[Depends(get_current_user), Depends(require_operational_license)],
+)
 def cancel_order(order_id: str, db: Session = Depends(get_db)):
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:

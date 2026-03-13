@@ -16,7 +16,7 @@ interface Props {
 }
 
 export default function PaymentModal({ total, onComplete, onClose, orderIds }: Props) {
-  const { session, register, user } = useAuthStore();
+  const { session, register } = useAuthStore();
   const items = useCartStore((s) => s.items);
   const [method, setMethod] = useState<"cash" | "card" | "mixed">("cash");
   const [cashAmount, setCashAmount] = useState("");
@@ -40,7 +40,6 @@ export default function PaymentModal({ total, onComplete, onClose, orderIds }: P
       const { data } = await api.post("/sales/", {
         cash_session_id: session.id,
         register_id: register.id,
-        seller_id: user?.id,
         payment_method: method,
         cash_amount: method === "card" ? 0 : cashNum,
         card_amount: method === "cash" ? 0 : method === "card" ? total : cardNum,

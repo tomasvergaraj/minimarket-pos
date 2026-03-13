@@ -6,11 +6,11 @@ from fastapi.responses import FileResponse
 
 from app.api.deps import require_admin
 from app.core.config import ROOT_DIR, settings
-from app.api.routes import products, sales, cash, kardex, reports, users, dashboard, orders
+from app.api.routes import products, sales, cash, kardex, reports, users, dashboard, orders, license
 from app.schemas.config import ConfigUpdate, ConfigResponse
 from app.tax.sii.boleta import router as sii_router
 
-app = FastAPI(title="MiniMarket POS Server", version="1.0.0")
+app = FastAPI(title="Nexo Server", version="1.0.0")
 
 ADMIN_DIST_DIR = ROOT_DIR.parent / "admin-web" / "dist"
 ADMIN_INDEX_FILE = ADMIN_DIST_DIR / "index.html"
@@ -37,6 +37,7 @@ app.include_router(reports.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
+app.include_router(license.router, prefix="/api")
 app.include_router(sii_router, prefix="/api")
 
 
@@ -45,7 +46,7 @@ def health():
     return {"status": "ok", "store": settings.STORE_NAME}
 
 
-@app.get("/api/config")
+@app.get("/api/config", dependencies=[Depends(require_admin)])
 def get_config():
     return {
         "store_name": settings.STORE_NAME,

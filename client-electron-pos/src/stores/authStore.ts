@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import api from "@/services/api";
-import type { User, CashRegister, CashSession } from "@/types";
+import api, { clearAuthToken, setAuthToken } from "@/services/api";
+import type { AuthSession, User, CashRegister, CashSession } from "@/types";
 
 interface AuthState {
   user: User | null;
@@ -23,11 +23,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   registers: [],
 
   loginWithPin: async (pin: string) => {
-    const { data } = await api.post("/users/login/pin", { pin });
-    set({ user: data });
+    const response = await api.post("/users/login/pin", { pin });
+    const session: AuthSession = response.data.data ?? response.data;
+    setAuthToken(session.access_token);
+    set({ user: session.user });
   },
 
-  logout: () => set({ user: null, session: null, register: null }),
+  logout: () => {
+    clearAuthToken();
+    set({ user: null, session: null, register: null });
+  },
 
   fetchRegisters: async () => {
     const { data } = await api.get("/cash/registers");
@@ -37,11 +42,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   selectRegister: (reg) => set({ register: reg }),
 
   openSession: async (openingAmount: number) => {
-    const { register, user } = get();
+    const { register } = get();
     if (!register) throw new Error("No register selected");
     const { data } = await api.post("/cash/sessions/open", {
       register_id: register.id,
-      user_id: user?.id,
       opening_amount: openingAmount,
     });
     set({ session: data });

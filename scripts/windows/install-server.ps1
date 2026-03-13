@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$StoreName = "MiniMarket POS",
+    [string]$StoreName = "Nexo",
     [string]$StoreRut = "",
     [string]$StoreAddress = "",
     [ValidatePattern("^\d{4,10}$")]
@@ -650,7 +650,7 @@ Ensure-FirewallRule -Port $ServerPort
 Ensure-AutostartTask -ServerDir $serverDir
 
 Write-Host ""
-Write-Host "MiniMarket POS server installation completed." -ForegroundColor Green
+Write-Host "Nexo server installation completed." -ForegroundColor Green
 Write-Host "API URL: http://localhost:$ServerPort"
 if (-not $SkipAdminBuild.IsPresent) {
     Write-Host "Admin URL: http://localhost:$ServerPort/admin"

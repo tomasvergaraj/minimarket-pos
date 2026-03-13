@@ -1,7 +1,7 @@
 {
   "name": "minimarket-pos",
-  "version": "1.0.8",
-  "description": "MiniMarket POS - Punto de Venta",
+  "version": "1.0.9",
+  "description": "Nexo - Sistema de ventas y gestion",
   "author": "tomasvergaraj",
   "main": "electron/main.js",
   "scripts": {
@@ -42,7 +42,7 @@
   },
   "build": {
     "appId": "com.minimarket.pos",
-    "productName": "MiniMarket POS",
+    "productName": "Nexo",
     "directories": {
       "output": "dist-electron"
     },
@@ -53,7 +53,7 @@
     "win": {
       "target": "nsis",
       "icon": "public/icon.ico",
-      "artifactName": "MiniMarket-POS-Setup-${version}.${ext}"
+      "artifactName": "Nexo-Setup-${version}.${ext}"
     },
     "linux": {
       "target": [
@@ -62,7 +62,7 @@
       ],
       "category": "Office",
       "icon": "public/icon.png",
-      "artifactName": "MiniMarket-POS-${version}.${ext}"
+      "artifactName": "Nexo-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,

@@ -1,8 +1,13 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Sale } from "@/types";
-import { Printer, Settings, X } from "lucide-react";
+import { Download, MessageCircle, Printer, Settings, X } from "lucide-react";
 import toast from "react-hot-toast";
-import { buildReceiptContent, buildReceiptHtml } from "@/services/printer";
+import {
+  buildReceiptContent,
+  buildReceiptHtml,
+  buildReceiptPdfFileName,
+  buildReceiptWhatsAppText,
+} from "@/services/printer";
 import { getSavedPrinterName } from "@/pages/SettingsPage";
 import { useNavigate } from "react-router-dom";
 
@@ -16,6 +21,9 @@ interface Props {
 export default function ReceiptPreviewModal({ sale, onClose, sellerName, registerName }: Props) {
   const navigate = useNavigate();
   const printerName = getSavedPrinterName();
+  const [savingPdf, setSavingPdf] = useState(false);
+  const [openingWhatsApp, setOpeningWhatsApp] = useState(false);
+  const hasDesktopApi = !!window.electronAPI;
   const canPrint = !!window.electronAPI && !!printerName;
 
   const receiptHtml = buildReceiptHtml(sale, {
@@ -47,6 +55,57 @@ export default function ReceiptPreviewModal({ sale, onClose, sellerName, registe
     }
   }, [onClose, printerName, registerName, sale, sellerName]);
 
+  const handleSavePdf = useCallback(async () => {
+    if (!window.electronAPI) {
+      toast.error("PDF solo disponible en app de escritorio");
+      return;
+    }
+
+    setSavingPdf(true);
+    try {
+      const content = buildReceiptContent(sale, {
+        registerName,
+        sellerName,
+      });
+      const result = await window.electronAPI.saveReceiptPdf({
+        content,
+        defaultFileName: buildReceiptPdfFileName(sale),
+      });
+
+      if (result.success) {
+        toast.success("Boleta guardada como PDF");
+      } else if (!result.canceled) {
+        toast.error(`Error guardando PDF: ${result.error}`);
+      }
+    } finally {
+      setSavingPdf(false);
+    }
+  }, [registerName, sale, sellerName]);
+
+  const handleOpenWhatsApp = useCallback(async () => {
+    if (!window.electronAPI) {
+      toast.error("WhatsApp solo disponible en app de escritorio");
+      return;
+    }
+
+    setOpeningWhatsApp(true);
+    try {
+      const text = buildReceiptWhatsAppText(sale, {
+        registerName,
+        sellerName,
+      });
+      const result = await window.electronAPI.openWhatsApp({ text });
+
+      if (result.success) {
+        toast.success("WhatsApp abierto");
+      } else {
+        toast.error(`Error abriendo WhatsApp: ${result.error}`);
+      }
+    } finally {
+      setOpeningWhatsApp(false);
+    }
+  }, [registerName, sale, sellerName]);
+
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -55,7 +114,7 @@ export default function ReceiptPreviewModal({ sale, onClose, sellerName, registe
       }
       if (event.key === "Enter" && !event.repeat) {
         event.stopPropagation();
-        handlePrint();
+        void handlePrint();
       }
     };
 
@@ -92,6 +151,26 @@ export default function ReceiptPreviewModal({ sale, onClose, sellerName, registe
             </div>
           )}
 
+          <div className="flex items-center gap-3 text-xs">
+            <button
+              onClick={() => void handleSavePdf()}
+              disabled={!hasDesktopApi || savingPdf}
+              className="inline-flex items-center gap-1.5 text-white/70 hover:text-white disabled:opacity-40 transition"
+            >
+              <Download size={14} />
+              {savingPdf ? "Guardando..." : "PDF"}
+            </button>
+            <span className="h-3 w-px bg-white/20" />
+            <button
+              onClick={() => void handleOpenWhatsApp()}
+              disabled={!hasDesktopApi || openingWhatsApp}
+              className="inline-flex items-center gap-1.5 text-white/70 hover:text-white disabled:opacity-40 transition"
+            >
+              <MessageCircle size={14} />
+              {openingWhatsApp ? "Abriendo..." : "WhatsApp"}
+            </button>
+          </div>
+
           <div className="flex gap-3">
             <button
               onClick={onClose}
@@ -102,7 +181,7 @@ export default function ReceiptPreviewModal({ sale, onClose, sellerName, registe
               <span className="text-white/50 text-xs ml-1">(Esc)</span>
             </button>
             <button
-              onClick={handlePrint}
+              onClick={() => void handlePrint()}
               disabled={!canPrint}
               title={!canPrint ? "Configura una impresora en Ajustes" : undefined}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:opacity-60 text-white px-8 py-3 rounded-xl font-bold transition shadow-lg"

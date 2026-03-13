@@ -117,7 +117,7 @@ def status_task() -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Manage MiniMarket POS backend auto-start.")
+    parser = argparse.ArgumentParser(description="Manage Nexo backend auto-start.")
     parser.add_argument(
         "command",
         nargs="?",

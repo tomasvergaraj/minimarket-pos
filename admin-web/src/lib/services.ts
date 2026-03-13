@@ -10,6 +10,8 @@ import {
   mockConfig,
 } from './mock-data'
 import type {
+  AuthSession,
+  LicenseStatus,
   User,
   UserCreate,
   UserUpdate,
@@ -281,12 +283,17 @@ export async function updateUser(id: string, data: UserUpdate): Promise<User> {
 
 // ── Auth ──
 
-export async function loginWithPin(pin: string): Promise<User> {
+export async function loginWithPin(pin: string): Promise<AuthSession> {
   if (USE_MOCKS) {
     await delay()
-    if (pin === '1234') return mockUsers[0]
-    if (pin === '0000') return mockUsers[1]
-    throw new Error('PIN incorrecto')
+    const user = pin === '1234' ? mockUsers[0] : pin === '0000' ? mockUsers[1] : null
+    if (!user) throw new Error('PIN incorrecto')
+    return {
+      access_token: 'mock-token',
+      token_type: 'bearer',
+      expires_in: 60 * 60,
+      user,
+    }
   }
   const res = await api.post('/users/login/pin', { pin })
   return res.data.data ?? res.data
@@ -340,6 +347,71 @@ export async function updateConfig(data: StoreConfig): Promise<StoreConfig> {
     return { ...data }
   }
   const res = await api.put('/config', data)
+  return res.data.data ?? res.data
+}
+
+// License
+
+export async function fetchLicenseStatus(): Promise<LicenseStatus> {
+  if (USE_MOCKS) {
+    await delay(200)
+    return {
+      status: 'trial',
+      message: 'Prueba activa: quedan 30 dias',
+      is_active: true,
+      verification_ready: true,
+      installation_id: 'mock-installation-id',
+      hardware_hash: 'mock-hardware-hash',
+      request_code: 'mock-request-code',
+      request_payload_json: JSON.stringify(
+        {
+          version: 1,
+          product: 'nexo-pos',
+          installation_id: 'mock-installation-id',
+          hardware_hash: 'mock-hardware-hash',
+          store_name: 'Nexo Demo',
+          store_rut: '76.123.456-7',
+          generated_at: new Date().toISOString(),
+        },
+        null,
+        2
+      ),
+      trial_started_at: new Date().toISOString(),
+      trial_expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+      trial_days_remaining: 30,
+      activated_at: null,
+      license_id: null,
+      customer_name: null,
+      license_type: null,
+      license_expires_at: null,
+      updates_until: null,
+      max_registers: 3,
+      features: ['offline', 'sii'],
+      register_count: 1,
+      last_validation_error: null,
+    }
+  }
+  const res = await api.get('/license/status')
+  return res.data.data ?? res.data
+}
+
+export async function activateLicense(licenseDocument: string): Promise<LicenseStatus> {
+  if (USE_MOCKS) {
+    await delay(400)
+    const status = await fetchLicenseStatus()
+    return {
+      ...status,
+      status: 'licensed',
+      message: 'Licencia activa para Cliente Demo',
+      is_active: true,
+      activated_at: new Date().toISOString(),
+      license_id: 'LIC-DEMO-001',
+      customer_name: 'Cliente Demo',
+      license_type: 'perpetual',
+      trial_days_remaining: null,
+    }
+  }
+  const res = await api.post('/license/activate', { license_document: licenseDocument })
   return res.data.data ?? res.data
 }
 

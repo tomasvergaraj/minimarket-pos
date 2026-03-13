@@ -10,9 +10,9 @@ import {
   Settings,
   ChevronsLeft,
   ChevronsRight,
-  Store,
 } from 'lucide-react'
 import clsx from 'clsx'
+import nexoIconUrl from '../../assets/nexo-icon.svg'
 
 const iconMap = {
   LayoutDashboard,
@@ -51,13 +51,11 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
     >
       {/* Brand */}
       <div className="h-14 flex items-center gap-2.5 px-4 border-b border-white/6">
-        <div className="w-8 h-8 rounded-md bg-primary-600 flex items-center justify-center shrink-0">
-          <Store className="w-4 h-4 text-white" />
-        </div>
+        <img src={nexoIconUrl} alt="Nexo" className="w-8 h-8 rounded-md shrink-0" />
         {!collapsed && (
           <div className="overflow-hidden">
             <p className="text-[13px] font-semibold text-white leading-tight tracking-tight truncate">
-              MiniMarket
+              Nexo
             </p>
             <p className="text-[10px] text-gray-500 uppercase tracking-widest">
               Admin

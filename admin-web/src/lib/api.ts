@@ -1,4 +1,7 @@
 import axios from 'axios'
+import type { StoredAdminSession } from '../types'
+
+const ADMIN_SESSION_KEY = 'admin_session'
 
 function resolveAdminPath(path: string): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
@@ -29,18 +32,31 @@ const api = axios.create({
   timeout: 15000,
 })
 
-// Inject admin role header.
+export function getStoredAdminSession(): StoredAdminSession | null {
+  const raw = localStorage.getItem(ADMIN_SESSION_KEY)
+  if (!raw) return null
+
+  try {
+    return JSON.parse(raw) as StoredAdminSession
+  } catch {
+    localStorage.removeItem(ADMIN_SESSION_KEY)
+    return null
+  }
+}
+
+export function setStoredAdminSession(session: StoredAdminSession) {
+  localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session))
+}
+
+export function clearStoredAdminSession() {
+  localStorage.removeItem(ADMIN_SESSION_KEY)
+}
+
 api.interceptors.request.use((config) => {
-  const userJson = localStorage.getItem('admin_user')
-  if (userJson) {
-    try {
-      const user = JSON.parse(userJson)
-      if (user.role === 'admin') {
-        config.headers['X-User-Role'] = 'admin'
-      }
-    } catch {
-      // Ignore corrupted localStorage.
-    }
+  const session = getStoredAdminSession()
+  if (session?.access_token) {
+    config.headers = config.headers ?? {}
+    config.headers.Authorization = `Bearer ${session.access_token}`
   }
   return config
 })
@@ -56,10 +72,10 @@ api.interceptors.response.use(
     const status = error.response.status
     const detail = error.response.data?.detail
 
-    if (status === 401 || status === 403) {
+    if (status === 401) {
       const msg = typeof detail === 'object' ? detail.message : 'Sesion expirada'
       const loginPath = resolveAdminPath('/login')
-      localStorage.removeItem('admin_user')
+      clearStoredAdminSession()
       if (window.location.pathname !== loginPath) {
         window.location.href = loginPath
       }

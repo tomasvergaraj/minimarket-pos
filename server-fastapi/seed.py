@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta
 from sqlalchemy import text, inspect as sa_inspect
 
+from app.core.security import hash_pin
 from app.db.base import Base
 from app.db.session import engine, SessionLocal
 from app.models import Product, User, CashRegister
@@ -59,11 +60,11 @@ def seed():
 
     # Admin user
     if not db.query(User).filter(User.username == "admin").first():
-        db.add(User(username="admin", pin="1234", full_name="Administrador", role="admin"))
+        db.add(User(username="admin", pin=hash_pin("1234"), full_name="Administrador", role="admin"))
 
     # Cashier
     if not db.query(User).filter(User.username == "cajero1").first():
-        db.add(User(username="cajero1", pin="0000", full_name="Cajero 1", role="cashier"))
+        db.add(User(username="cajero1", pin=hash_pin("0000"), full_name="Cajero 1", role="cashier"))
 
     # Registers
     for i in range(1, 4):

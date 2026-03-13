@@ -2,9 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  color-scheme: light;
+  --nexo-100: #cffafe;
+  --nexo-600: #0891b2;
+  --nexo-900: #0f172a;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background:
+    radial-gradient(circle at top left, rgb(103 232 249 / 0.16), transparent 28%),
+    linear-gradient(180deg, #f7fcfe 0%, #eef7f9 100%);
+  color: var(--nexo-900);
+}
+
+::selection {
+  background: var(--nexo-100);
+  color: var(--nexo-900);
+}
+
+:focus-visible {
+  outline-color: var(--nexo-600);
 }
 
 /* Hide number input spinners */

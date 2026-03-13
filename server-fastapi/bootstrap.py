@@ -19,12 +19,12 @@ ENV_PATH = ROOT_DIR / ".env"
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Bootstrap MiniMarket POS backend")
+    parser = argparse.ArgumentParser(description="Bootstrap Nexo backend")
     parser.add_argument("--database-url", required=True)
     parser.add_argument("--server-host", default="0.0.0.0")
     parser.add_argument("--server-port", type=int, default=8000)
     parser.add_argument("--secret-key", default="")
-    parser.add_argument("--store-name", default="MiniMarket POS")
+    parser.add_argument("--store-name", default="Nexo")
     parser.add_argument("--store-rut", default="")
     parser.add_argument("--store-address", default="")
     parser.add_argument("--cors-origins", default="http://localhost:5174,http://127.0.0.1:5174")

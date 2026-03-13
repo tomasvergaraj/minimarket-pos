@@ -36,6 +36,41 @@ export interface User {
   created_at: string
 }
 
+export interface AuthSession {
+  access_token: string
+  token_type: 'bearer'
+  expires_in: number
+  user: User
+}
+
+export interface StoredAdminSession extends AuthSession {
+  expires_at: string
+}
+
+export interface LicenseStatus {
+  status: string
+  message: string
+  is_active: boolean
+  verification_ready: boolean
+  installation_id: string
+  hardware_hash: string
+  request_code: string
+  request_payload_json: string
+  trial_started_at: string | null
+  trial_expires_at: string | null
+  trial_days_remaining: number | null
+  activated_at: string | null
+  license_id: string | null
+  customer_name: string | null
+  license_type: string | null
+  license_expires_at: string | null
+  updates_until: string | null
+  max_registers: number | null
+  features: string[]
+  register_count: number
+  last_validation_error: string | null
+}
+
 export interface UserCreate {
   username: string
   pin: string

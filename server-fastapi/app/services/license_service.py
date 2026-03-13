@@ -127,15 +127,15 @@ def _load_public_key() -> Ed25519PublicKey | None:
 
     path = Path(path_text)
     if not path.exists():
-        raise LicenseError("LICENSE_PUBLIC_KEY_MISSING", f"No se encontro la clave publica: {path}")
+        raise LicenseError("LICENSE_PUBLIC_KEY_MISSING", f"No se encontró la clave pública: {path}")
 
     try:
         public_key = serialization.load_pem_public_key(path.read_bytes())
     except ValueError as exc:
-        raise LicenseError("LICENSE_PUBLIC_KEY_INVALID", "La clave publica no tiene un PEM valido") from exc
+        raise LicenseError("LICENSE_PUBLIC_KEY_INVALID", "La clave pública no tiene un PEM válido") from exc
 
     if not isinstance(public_key, Ed25519PublicKey):
-        raise LicenseError("LICENSE_PUBLIC_KEY_INVALID", "La clave publica debe ser Ed25519")
+        raise LicenseError("LICENSE_PUBLIC_KEY_INVALID", "La clave pública debe ser Ed25519")
     return public_key
 
 
@@ -220,10 +220,10 @@ def _read_signed_document(license_document: str) -> tuple[dict[str, Any], str]:
     try:
         document = json.loads(license_document)
     except json.JSONDecodeError as exc:
-        raise LicenseError("LICENSE_DOCUMENT_INVALID", "El archivo de licencia no es JSON valido") from exc
+        raise LicenseError("LICENSE_DOCUMENT_INVALID", "El archivo de licencia no es JSON válido") from exc
 
     if not isinstance(document, dict):
-        raise LicenseError("LICENSE_DOCUMENT_INVALID", "El archivo de licencia tiene un formato invalido")
+        raise LicenseError("LICENSE_DOCUMENT_INVALID", "El archivo de licencia tiene un formato inválido")
 
     payload = document.get("payload")
     signature = document.get("signature")
@@ -243,13 +243,13 @@ def _verify_payload_for_machine(
     if public_key is None:
         raise LicenseError(
             "LICENSE_PUBLIC_KEY_MISSING",
-            "No hay clave publica configurada para verificar licencias",
+            "No hay clave pública configurada para verificar licencias",
         )
 
     try:
         signature_bytes = base64.b64decode(signature.encode("ascii"))
     except ValueError as exc:
-        raise LicenseError("LICENSE_DOCUMENT_INVALID", "La firma de la licencia no es valida") from exc
+        raise LicenseError("LICENSE_DOCUMENT_INVALID", "La firma de la licencia no es válida") from exc
 
     try:
         public_key.verify(signature_bytes, _json_dumps(payload))
@@ -259,7 +259,7 @@ def _verify_payload_for_machine(
     if str(payload.get("product")) != PRODUCT_CODE:
         raise LicenseError("LICENSE_PRODUCT_INVALID", "La licencia no corresponde a este producto")
     if str(payload.get("installation_id")) != installation_id:
-        raise LicenseError("LICENSE_INSTALLATION_MISMATCH", "La licencia no corresponde a esta instalacion")
+        raise LicenseError("LICENSE_INSTALLATION_MISMATCH", "La licencia no corresponde a esta instalación")
     if str(payload.get("hardware_hash")) != current_hardware_hash:
         raise LicenseError("HARDWARE_MISMATCH", "La licencia no corresponde a este servidor")
 
@@ -271,11 +271,11 @@ def _verify_payload_for_machine(
 
     license_expires_at = _parse_datetime(payload.get("expires_at"))
     if license_expires_at and _utcnow() > license_expires_at:
-        raise LicenseError("LICENSE_EXPIRED", "La licencia enviada ya esta vencida")
+        raise LicenseError("LICENSE_EXPIRED", "La licencia enviada ya está vencida")
 
     features = payload.get("features") or []
     if not isinstance(features, list):
-        raise LicenseError("LICENSE_DOCUMENT_INVALID", "La licencia tiene un formato de features invalido")
+        raise LicenseError("LICENSE_DOCUMENT_INVALID", "La licencia tiene un formato de features inválido")
 
     return {
         "license_id": license_id,
@@ -340,7 +340,7 @@ def get_license_status(db: Session) -> dict[str, Any]:
     if state.max_seen_at and now < state.max_seen_at - timedelta(minutes=settings.LICENSE_CLOCK_SKEW_MINUTES):
         state.status = "clock_tampered"
         state.validation_error = (
-            "Se detecto un retroceso importante en el reloj del servidor. "
+            "Se detectó un retroceso importante en el reloj del servidor. "
             "Ajusta la fecha/hora y vuelve a intentar."
         )
         state.last_seen_at = now
@@ -398,7 +398,7 @@ def get_license_status(db: Session) -> dict[str, Any]:
                 state.validation_error = exc.message
             else:
                 state.status = "license_document_invalid"
-                state.validation_error = "La licencia guardada no tiene un formato valido"
+                state.validation_error = "La licencia guardada no tiene un formato válido"
             db.commit()
             db.refresh(state)
             return _build_status_snapshot(
@@ -416,7 +416,7 @@ def get_license_status(db: Session) -> dict[str, Any]:
         state.status = "hardware_mismatch"
         state.validation_error = (
             "La prueba o licencia estaba asociada a otro servidor. "
-            "Genera un nuevo codigo de activacion para reemitir la licencia."
+            "Genera un nuevo código de activación para reemitir la licencia."
         )
         db.commit()
         db.refresh(state)
@@ -442,7 +442,7 @@ def get_license_status(db: Session) -> dict[str, Any]:
             state=state,
             current_hardware_hash=current_hardware_hash,
             status="trial",
-            message=f"Prueba activa: quedan {trial_days_remaining} dias",
+            message=f"Prueba activa: quedan {trial_days_remaining} días",
             is_active=True,
             verification_ready=verification_ready,
             trial_days_remaining=trial_days_remaining,
@@ -450,7 +450,7 @@ def get_license_status(db: Session) -> dict[str, Any]:
         )
 
     state.status = "trial_expired"
-    state.validation_error = "La prueba de 30 dias termino. Debes activar una licencia para seguir operando."
+    state.validation_error = "La prueba de 30 días terminó. Debes activar una licencia para seguir operando."
     db.commit()
     db.refresh(state)
     return _build_status_snapshot(
@@ -480,6 +480,6 @@ def ensure_register_capacity(db: Session) -> dict[str, Any]:
         raise LicenseError(
             "REGISTER_LIMIT_REACHED",
             f"La licencia permite {status['max_registers']} cajas activas. "
-            "Compra una ampliacion para agregar otra.",
+            "Compra una ampliación para agregar otra.",
         )
     return status

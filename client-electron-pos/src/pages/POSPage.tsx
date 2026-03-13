@@ -196,7 +196,7 @@ export default function POSPage() {
 
   const handleSaveOrder = async () => {
     if (items.length === 0) {
-      toast.error("El carrito esta vacio");
+      toast.error("El carrito está vacío");
       return;
     }
     if (!register) {
@@ -295,7 +295,7 @@ export default function POSPage() {
               onChange={(event) => setSearchQuery(event.target.value)}
               onKeyDown={handleSearchKeyDown}
               className="w-full pl-10 pr-10 py-3 border-2 border-gray-200 rounded-xl text-lg focus:border-blue-500 focus:outline-none"
-              placeholder="Escanear codigo o buscar producto... (F2)"
+              placeholder="Escanear código o buscar producto... (F2)"
               autoFocus
             />
             {searchQuery && (
@@ -533,7 +533,7 @@ export default function POSPage() {
                   className="w-full border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-blue-500"
                 />
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-gray-400">Al guardar se abrira la vista previa de la comanda.</span>
+                  <span className="text-xs text-gray-400">Al guardar se abrirá la vista previa de la comanda.</span>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setShowOrderRef(false)}

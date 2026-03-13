@@ -33,11 +33,11 @@ export default function ReceiptPreviewModal({ sale, onClose, sellerName, registe
 
   const handlePrint = useCallback(async () => {
     if (!window.electronAPI) {
-      toast.error("Impresion solo disponible en app de escritorio");
+      toast.error("Impresión solo disponible en app de escritorio");
       return;
     }
     if (!printerName) {
-      toast.error("Configura una impresora en Configuracion antes de imprimir");
+      toast.error("Configura una impresora en Configuración antes de imprimir");
       return;
     }
 

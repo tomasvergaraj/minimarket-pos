@@ -46,7 +46,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-surface flex items-center justify-center p-4">
       <div className="w-full max-w-xs animate-slide-up">
-        {/* Brand */}
         <div className="text-center mb-8">
           <img src={nexoIconUrl} alt="Nexo" className="w-14 h-14 mx-auto mb-4" />
           <h1 className="text-lg font-semibold text-text-primary tracking-tight">
@@ -58,7 +57,6 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-surface-card rounded-lg border border-border p-6">
-          {/* PIN Display */}
           <div className="flex justify-center gap-2 mb-6" aria-label="PIN ingresado">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
@@ -77,7 +75,6 @@ export default function LoginPage() {
             ))}
           </div>
 
-          {/* Error */}
           {error && (
             <div className="flex items-center gap-2 text-[13px] text-danger bg-danger-light border border-red-100 rounded-md px-3 py-2 mb-4 animate-slide-up">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -85,7 +82,6 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Numpad */}
           <div
             className="grid grid-cols-3 gap-1.5 mb-5"
             onKeyDown={handleKeyDown}
@@ -118,7 +114,6 @@ export default function LoginPage() {
             )}
           </div>
 
-          {/* Submit */}
           <button
             type="button"
             onClick={handleSubmit}

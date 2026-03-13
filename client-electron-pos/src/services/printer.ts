@@ -147,8 +147,8 @@ export function buildReceiptHtml(sale: Sale, options: ReceiptBuildOptions = {}) 
     <div style="border-top:1px dashed ${RECEIPT_COLOR_SEPARATOR};margin:8px 0;"></div>
     <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
       ${layout.barcodeDataUrl
-        ? `<img src="${layout.barcodeDataUrl}" alt="Codigo SII" style="display:block;width:240px;max-width:100%;margin:0 auto;" />`
-        : `<div style="font-size:10px;font-weight:700;color:${RECEIPT_COLOR_PRIMARY};text-align:center;">CODIGO SII NO DISPONIBLE</div>`}
+        ? `<img src="${layout.barcodeDataUrl}" alt="Código SII" style="display:block;width:240px;max-width:100%;margin:0 auto;" />`
+        : `<div style="font-size:10px;font-weight:700;color:${RECEIPT_COLOR_PRIMARY};text-align:center;">CÓDIGO SII NO DISPONIBLE</div>`}
       <div style="text-align:center;font-size:9px;line-height:1.25;">
         <div style="color:${RECEIPT_COLOR_MUTED};">DTE Tipo 39 | Folio: ${escapeHtml(String(layout.siiFolio ?? "-"))}</div>
         <div style="font-weight:700;color:${RECEIPT_COLOR_PRIMARY};">SII: ${escapeHtml(layout.siiStatusLabel)}</div>
@@ -170,7 +170,7 @@ export function buildReceiptHtml(sale: Sale, options: ReceiptBuildOptions = {}) 
       <div style="text-align:center;font-size:11px;color:${RECEIPT_COLOR_MUTED};line-height:1.25;">
         ${layout.isDte
           ? `
-            <div style="font-size:13px;font-weight:700;letter-spacing:0.06em;color:${RECEIPT_COLOR_PRIMARY};">BOLETA ELECTRONICA</div>
+            <div style="font-size:13px;font-weight:700;letter-spacing:0.06em;color:${RECEIPT_COLOR_PRIMARY};">BOLETA ELECTRÓNICA</div>
             <div style="font-size:14px;font-weight:700;color:${RECEIPT_COLOR_PRIMARY};">${escapeHtml(layout.saleNumberLabel)}</div>
           `
           : `<div style="font-weight:700;color:${RECEIPT_COLOR_PRIMARY};">${escapeHtml(layout.saleNumberLabel)}</div>`}
@@ -311,7 +311,7 @@ export function buildReceiptWhatsAppText(sale: Sale, options: ReceiptBuildOption
 
   const lines = [
     layout.storeName,
-    layout.isDte ? `Boleta electronica ${layout.saleNumberLabel}` : layout.saleNumberLabel,
+    layout.isDte ? `Boleta electrónica ${layout.saleNumberLabel}` : layout.saleNumberLabel,
     layout.createdAtLabel,
     "",
     ...layout.items.map((item) => `${item.quantity} x ${item.product_name} - ${formatCLP(item.subtotal)}`),

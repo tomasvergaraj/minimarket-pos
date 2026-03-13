@@ -357,7 +357,7 @@ export async function fetchLicenseStatus(): Promise<LicenseStatus> {
     await delay(200)
     return {
       status: 'trial',
-      message: 'Prueba activa: quedan 30 dias',
+      message: 'Prueba activa: quedan 30 días',
       is_active: true,
       verification_ready: true,
       installation_id: 'mock-installation-id',

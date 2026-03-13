@@ -74,7 +74,7 @@ api.interceptors.response.use(
     const detail = error.response.data?.detail
 
     if (status === 401) {
-      const msg = typeof detail === 'object' ? detail.message : 'Sesion expirada'
+      const msg = typeof detail === 'object' ? detail.message : 'Sesión expirada'
       const loginPath = resolveAdminPath('/login')
       clearStoredAdminSession()
       if (window.location.pathname !== loginPath) {

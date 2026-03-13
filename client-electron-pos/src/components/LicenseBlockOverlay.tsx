@@ -16,8 +16,8 @@ export default function LicenseBlockOverlay() {
 
   const helpText =
     user.role === "admin"
-      ? "Abre Configuracion para revisar el estado de licencia y pegar un archivo firmado."
-      : "Pidele a un administrador que entre a Configuracion y active la licencia para este servidor.";
+      ? "Abre Configuración para revisar el estado de la licencia y pegar un archivo firmado."
+      : "Pídele a un administrador que entre a Configuración y active la licencia para este servidor.";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-6 backdrop-blur-sm">
@@ -28,7 +28,7 @@ export default function LicenseBlockOverlay() {
               <AlertTriangle size={22} />
             </div>
             <div>
-              <p className="text-lg font-bold text-slate-900">Operacion bloqueada por licencia</p>
+              <p className="text-lg font-bold text-slate-900">Operación bloqueada por licencia</p>
               <p className="mt-1 text-sm text-amber-900">{blockingLicense.message}</p>
             </div>
           </div>
@@ -43,7 +43,7 @@ export default function LicenseBlockOverlay() {
               className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
             >
               <KeyRound size={16} />
-              Abrir configuracion
+              Abrir configuración
             </button>
 
             <button
@@ -51,7 +51,7 @@ export default function LicenseBlockOverlay() {
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             >
               <LogOut size={16} />
-              Cerrar sesion
+              Cerrar sesión
             </button>
           </div>
         </div>

@@ -37,7 +37,7 @@ export default function AdminLayout() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-amber-900">
-                    Operacion bloqueada por licencia
+                    Operación bloqueada por licencia
                   </p>
                   <p className="text-xs text-amber-800 truncate">
                     {blockingLicense.message}

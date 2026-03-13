@@ -139,7 +139,7 @@ export default function SettingsPage() {
   const handleSave = () => {
     setServerUrl(url);
     localStorage.setItem(PRINTER_KEY, selectedPrinter.trim());
-    toast.success("Configuracion guardada");
+    toast.success("Configuración guardada");
   };
 
   const handleActivate = async () => {
@@ -173,7 +173,7 @@ export default function SettingsPage() {
   const licenseSummary = useMemo(() => {
     if (!licenseStatus) return "Cargando estado de licencia...";
     if (licenseStatus.status === "trial") {
-      return `Prueba activa con ${licenseStatus.trial_days_remaining ?? 0} dias restantes`;
+      return `Prueba activa con ${licenseStatus.trial_days_remaining ?? 0} días restantes`;
     }
     if (licenseStatus.status === "licensed") {
       return licenseStatus.customer_name
@@ -200,7 +200,7 @@ export default function SettingsPage() {
                 <AlertTriangle size={18} />
               </div>
               <div>
-                <p className="font-semibold">Operacion bloqueada por licencia</p>
+                <p className="font-semibold">Operación bloqueada por licencia</p>
                 <p className="mt-1 text-sm">{blockingLicense.message}</p>
               </div>
             </div>
@@ -212,7 +212,7 @@ export default function SettingsPage() {
             <div className="rounded-2xl bg-white p-6 shadow">
               <div className="flex items-center gap-2">
                 <Server size={16} className="text-gray-400" />
-                <h2 className="text-xl font-bold text-gray-800">Configuracion</h2>
+                <h2 className="text-xl font-bold text-gray-800">Configuración</h2>
               </div>
 
               <div className="mt-6 space-y-6">
@@ -233,7 +233,7 @@ export default function SettingsPage() {
                     <div className="mb-1 flex items-center justify-between">
                       <label className="block text-sm font-medium text-gray-700">
                         <Printer size={14} className="mr-1 inline" />
-                        Impresora termica
+                        Impresora térmica
                       </label>
                       <button
                         onClick={loadPrinters}
@@ -279,7 +279,7 @@ export default function SettingsPage() {
 
                     {selectedPrinter && !detectedPrinterValue && (
                       <p className="mt-1 text-xs text-amber-600">
-                        El nombre guardado no aparece en la lista detectada. Se intentara usar exactamente ese nombre al imprimir.
+                        El nombre guardado no aparece en la lista detectada. Se intentará usar exactamente ese nombre al imprimir.
                       </p>
                     )}
 
@@ -293,7 +293,7 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-700">Pantalla completa</p>
-                      <p className="text-xs text-gray-500">Tambien puedes usar F11</p>
+                      <p className="text-xs text-gray-500">También puedes usar F11</p>
                     </div>
                     <button
                       onClick={toggleFullscreen}
@@ -323,7 +323,7 @@ export default function SettingsPage() {
                   <h3 className="text-xl font-bold text-gray-800">Licencia Offline</h3>
                 </div>
                 <p className="mt-1 text-sm text-gray-500">
-                  Estado comercial del servidor y activacion por archivo firmado.
+                  Estado comercial del servidor y activación por archivo firmado.
                 </p>
               </div>
 
@@ -345,7 +345,7 @@ export default function SettingsPage() {
                   <p className="font-semibold">Solo un administrador puede activar licencias</p>
                   <p className="mt-1">
                     {blockingLicense?.message ??
-                      "Si el sistema queda bloqueado por licencia, cierra sesion e ingresa con un usuario administrador para activarlo."}
+                      "Si el sistema queda bloqueado por licencia, cierra sesión e ingresa con un usuario administrador para activarlo."}
                   </p>
                 </div>
 
@@ -369,7 +369,7 @@ export default function SettingsPage() {
                       <div className="rounded-xl border border-gray-200 p-4">
                         <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-500">
                           <KeyRound size={14} />
-                          Instalacion
+                          Instalación
                         </div>
                         <p className="mt-2 break-all font-mono text-sm text-gray-800">
                           {licenseStatus.installation_id}
@@ -394,7 +394,7 @@ export default function SettingsPage() {
                         </p>
                         <p className="mt-1 text-xs text-gray-500">
                           Cajas activas: {licenseStatus.register_count}
-                          {licenseStatus.max_registers != null ? ` / ${licenseStatus.max_registers}` : " / sin limite"}
+                          {licenseStatus.max_registers != null ? ` / ${licenseStatus.max_registers}` : " / sin límite"}
                         </p>
                       </div>
                     </div>
@@ -402,21 +402,21 @@ export default function SettingsPage() {
                     <div className="rounded-xl border border-gray-200 p-4">
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <div>
-                          <h4 className="text-sm font-semibold text-gray-800">Solicitud de activacion</h4>
+                          <h4 className="text-sm font-semibold text-gray-800">Solicitud de activación</h4>
                           <p className="text-xs text-gray-500">
-                            Copia este payload y envialo al emisor de licencias.
+                            Copia este payload y envíalo al emisor de licencias.
                           </p>
                         </div>
                         <div className="flex gap-2">
                           <button
-                            onClick={() => void copyText(licenseStatus.request_code, "Codigo de activacion")}
+                            onClick={() => void copyText(licenseStatus.request_code, "Código de activación")}
                             className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-50"
                           >
                             <Copy size={13} />
-                            Codigo
+                            Código
                           </button>
                           <button
-                            onClick={() => void copyText(licenseStatus.request_payload_json, "Solicitud de activacion")}
+                            onClick={() => void copyText(licenseStatus.request_payload_json, "Solicitud de activación")}
                             className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-50"
                           >
                             <Copy size={13} />
@@ -436,7 +436,7 @@ export default function SettingsPage() {
                     <div className="rounded-xl border border-gray-200 p-4">
                       <h4 className="text-sm font-semibold text-gray-800">Activar licencia</h4>
                       <p className="mt-1 text-xs text-gray-500">
-                        Pega aqui el archivo JSON firmado que te entreguen despues de la compra.
+                        Pega aquí el archivo JSON firmado que te entreguen después de la compra.
                       </p>
 
                       <textarea

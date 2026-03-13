@@ -22,7 +22,7 @@ import { getServerUrl, setServerUrl } from '../../lib/api'
 import toast from 'react-hot-toast'
 
 function formatDate(value: string | null): string {
-  if (!value) return '—'
+  if (!value) return '-'
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return value
   return parsed.toLocaleString('es-CL')
@@ -73,7 +73,7 @@ export default function ConfigPage() {
     setLoading(true)
     try {
       await updateConfig(config)
-      toast.success('Configuracion guardada')
+      toast.success('Configuración guardada')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al guardar')
     } finally {
@@ -120,7 +120,7 @@ export default function ConfigPage() {
   const licenseSummary = useMemo(() => {
     if (!licenseStatus) return 'Cargando estado de licencia...'
     if (licenseStatus.status === 'trial') {
-      return `Prueba activa con ${licenseStatus.trial_days_remaining ?? 0} dias restantes`
+      return `Prueba activa con ${licenseStatus.trial_days_remaining ?? 0} días restantes`
     }
     if (licenseStatus.status === 'licensed') {
       return licenseStatus.customer_name
@@ -132,7 +132,7 @@ export default function ConfigPage() {
 
   return (
     <div>
-      <PageHeader title="Configuracion" description="Datos de la tienda y licencia comercial" />
+      <PageHeader title="Configuración" description="Datos de la tienda y licencia comercial" />
 
       <div className="max-w-5xl space-y-6">
         <form onSubmit={handleSave} className="space-y-4">
@@ -150,7 +150,7 @@ export default function ConfigPage() {
               placeholder="76.123.456-7"
             />
             <Input
-              label="Direccion"
+              label="Dirección"
               value={config.store_address}
               onChange={set('store_address')}
               placeholder="Av. Principal 123, Santiago"
@@ -168,7 +168,7 @@ export default function ConfigPage() {
             <h3 className="text-[13px] font-semibold text-text-secondary">Servidor API</h3>
           </div>
           <p className="text-xs text-text-muted">
-            URL del backend FastAPI. Util en redes LAN para apuntar a otro servidor.
+            URL del backend FastAPI. Útil en redes LAN para apuntar a otro servidor.
           </p>
           <div className="flex gap-2">
             <input
@@ -192,7 +192,7 @@ export default function ConfigPage() {
                 <h3 className="text-[13px] font-semibold text-text-secondary">Licencia Offline</h3>
               </div>
               <p className="text-xs text-text-muted mt-1">
-                Usa el codigo de activacion para emitir una licencia firmada para este PC servidor.
+                Usa el código de activación para emitir una licencia firmada para este PC servidor.
               </p>
             </div>
             <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusTone(licenseStatus?.status ?? 'loading', !!licenseStatus?.is_active)}`}>
@@ -212,7 +212,7 @@ export default function ConfigPage() {
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-sm font-medium">Falta la clave publica de licencias</p>
+                      <p className="text-sm font-medium">Falta la clave pública de licencias</p>
                       <p className="text-xs mt-1">
                         Configura <code>LICENSE_PUBLIC_KEY_PATH</code> en el backend para poder validar licencias firmadas.
                       </p>
@@ -225,7 +225,7 @@ export default function ConfigPage() {
                 <div className="rounded-lg border border-border p-4 space-y-2">
                   <div className="flex items-center gap-2 text-xs text-text-muted">
                     <KeyRound className="w-3.5 h-3.5" />
-                    <span>Instalacion</span>
+                    <span>Instalación</span>
                   </div>
                   <p className="text-sm font-mono break-all text-text-primary">{licenseStatus.installation_id}</p>
                   <p className="text-xs text-text-muted break-all">{licenseStatus.hardware_hash}</p>
@@ -246,7 +246,7 @@ export default function ConfigPage() {
                   </p>
                   <p className="text-xs text-text-muted">
                     Cajas activas: {licenseStatus.register_count}
-                    {licenseStatus.max_registers != null ? ` / ${licenseStatus.max_registers}` : ' / sin limite'}
+                    {licenseStatus.max_registers != null ? ` / ${licenseStatus.max_registers}` : ' / sin límite'}
                   </p>
                 </div>
               </div>
@@ -254,16 +254,16 @@ export default function ConfigPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h4 className="text-[13px] font-semibold text-text-secondary">Codigo de activacion</h4>
+                    <h4 className="text-[13px] font-semibold text-text-secondary">Código de activación</h4>
                     <p className="text-xs text-text-muted">
-                      Enviaselo al emisor de licencias para que te devuelva un archivo firmado.
+                      Envíaselo al emisor de licencias para que te devuelva un archivo firmado.
                     </p>
                   </div>
                   <Button
                     size="sm"
                     variant="secondary"
                     type="button"
-                    onClick={() => copyText(licenseStatus.request_code, 'Codigo de activacion')}
+                    onClick={() => copyText(licenseStatus.request_code, 'Código de activación')}
                   >
                     <Copy className="w-3.5 h-3.5" /> Copiar
                   </Button>
@@ -280,7 +280,7 @@ export default function ConfigPage() {
                 <div>
                   <h4 className="text-[13px] font-semibold text-text-secondary">Activar licencia</h4>
                   <p className="text-xs text-text-muted">
-                    Pega el archivo JSON firmado que te entreguen despues de comprar la licencia.
+                    Pega el archivo JSON firmado que te entreguen después de comprar la licencia.
                   </p>
                 </div>
                 <textarea
@@ -297,7 +297,7 @@ export default function ConfigPage() {
                   <Button
                     type="button"
                     variant="secondary"
-                    onClick={() => copyText(licenseStatus.request_payload_json, 'Solicitud de activacion')}
+                    onClick={() => copyText(licenseStatus.request_payload_json, 'Solicitud de activación')}
                   >
                     <Copy className="w-3.5 h-3.5" /> Copiar solicitud
                   </Button>

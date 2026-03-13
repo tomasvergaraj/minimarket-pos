@@ -1,6 +1,6 @@
 @echo off
 echo ============================================
-echo  MiniMarket POS - Server Setup
+echo  Nexo - Server Setup
 echo ============================================
 echo.
 

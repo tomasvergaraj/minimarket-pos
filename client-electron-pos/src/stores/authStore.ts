@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import api, { clearAuthToken, setAuthToken } from "@/services/api";
+import { useLicenseStore } from "@/stores/licenseStore";
 import type { AuthSession, User, CashRegister, CashSession } from "@/types";
 
 interface AuthState {
@@ -26,11 +27,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const response = await api.post("/users/login/pin", { pin });
     const session: AuthSession = response.data.data ?? response.data;
     setAuthToken(session.access_token);
+    useLicenseStore.getState().clearLicenseState();
     set({ user: session.user });
   },
 
   logout: () => {
     clearAuthToken();
+    useLicenseStore.getState().clearLicenseState();
     set({ user: null, session: null, register: null });
   },
 

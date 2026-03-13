@@ -1,5 +1,6 @@
 import axios from 'axios'
 import type { StoredAdminSession } from '../types'
+import { emitLicenseError, isLicenseErrorCode, normalizeLicenseCode } from './license'
 
 const ADMIN_SESSION_KEY = 'admin_session'
 
@@ -84,6 +85,10 @@ api.interceptors.response.use(
 
     if (detail) {
       const msg = typeof detail === 'object' ? detail.message : String(detail)
+      const code = typeof detail === 'object' ? normalizeLicenseCode(detail.code) : ''
+      if (status === 403 && isLicenseErrorCode(code)) {
+        emitLicenseError({ code, message: msg })
+      }
       return Promise.reject(new Error(msg))
     }
 

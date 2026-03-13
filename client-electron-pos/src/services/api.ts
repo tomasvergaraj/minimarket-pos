@@ -1,4 +1,6 @@
 import axios from "axios";
+import { isLicenseErrorCode, normalizeLicenseCode } from "@/lib/license";
+import { useLicenseStore } from "@/stores/licenseStore";
 
 const SERVER_URL = localStorage.getItem("server_url") || "http://localhost:8000";
 let authToken = "";
@@ -23,6 +25,7 @@ api.interceptors.response.use(
 
     if (authToken && error.response?.status === 401) {
       clearAuthToken();
+      useLicenseStore.getState().clearLicenseState();
       if (typeof window !== "undefined") {
         window.location.hash = "#/";
         window.location.reload();
@@ -30,6 +33,12 @@ api.interceptors.response.use(
     }
 
     if (detail) {
+      const code = typeof detail === "object" ? normalizeLicenseCode(detail.code) : "";
+      const message = typeof detail === "object" ? detail.message : String(detail);
+      if (error.response?.status === 403 && isLicenseErrorCode(code)) {
+        useLicenseStore.getState().setBlockingLicense({ code, message });
+      }
+
       error.message = typeof detail === "object" ? detail.message : String(detail);
     }
 

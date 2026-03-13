@@ -11,11 +11,11 @@ import {
 import PageHeader from '../../components/patterns/PageHeader'
 import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
-import type { LicenseStatus, StoreConfig } from '../../types'
+import type { StoreConfig } from '../../types'
+import { useLicense } from '../../context/LicenseContext'
 import {
   activateLicense,
   fetchConfig,
-  fetchLicenseStatus,
   updateConfig,
 } from '../../lib/services'
 import { getServerUrl, setServerUrl } from '../../lib/api'
@@ -42,10 +42,15 @@ export default function ConfigPage() {
   const [config, setConfig] = useState<StoreConfig>({ store_name: '', store_rut: '', store_address: '' })
   const [loading, setLoading] = useState(false)
   const [serverUrl, setServerUrlState] = useState(getServerUrl())
-  const [licenseStatus, setLicenseStatus] = useState<LicenseStatus | null>(null)
-  const [loadingLicense, setLoadingLicense] = useState(false)
   const [activatingLicense, setActivatingLicense] = useState(false)
   const [licenseDocument, setLicenseDocument] = useState('')
+  const {
+    licenseStatus,
+    loadingLicense,
+    refreshLicenseStatus,
+    syncLicenseStatus,
+    clearBlockingLicense,
+  } = useLicense()
 
   useEffect(() => {
     fetchConfig()
@@ -54,14 +59,11 @@ export default function ConfigPage() {
   }, [])
 
   useEffect(() => {
-    setLoadingLicense(true)
-    fetchLicenseStatus()
-      .then(setLicenseStatus)
-      .catch((err) => {
-        toast.error(err instanceof Error ? err.message : 'No se pudo cargar la licencia')
-      })
-      .finally(() => setLoadingLicense(false))
-  }, [])
+    if (licenseStatus || loadingLicense) return
+    refreshLicenseStatus().catch((err) => {
+      toast.error(err instanceof Error ? err.message : 'No se pudo cargar la licencia')
+    })
+  }, [licenseStatus, loadingLicense, refreshLicenseStatus])
 
   const set = (field: keyof StoreConfig) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setConfig((c) => ({ ...c, [field]: e.target.value }))
@@ -104,7 +106,8 @@ export default function ConfigPage() {
     setActivatingLicense(true)
     try {
       const status = await activateLicense(licenseDocument)
-      setLicenseStatus(status)
+      syncLicenseStatus(status)
+      clearBlockingLicense()
       setLicenseDocument('')
       toast.success('Licencia activada')
     } catch (err) {

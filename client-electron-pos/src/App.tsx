@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { useAuthStore } from "@/stores/authStore";
+import LicenseBlockOverlay from "@/components/LicenseBlockOverlay";
 import LoginPage from "@/pages/LoginPage";
 import RegisterSelectPage from "@/pages/RegisterSelectPage";
 import OpenSessionPage from "@/pages/OpenSessionPage";
@@ -17,18 +18,23 @@ export default function App() {
     <>
       <Toaster position="top-right" />
       <UpdateBanner />
+      <LicenseBlockOverlay />
       <Routes>
         {!user ? (
           <Route path="*" element={<LoginPage />} />
-        ) : !register ? (
-          <Route path="*" element={<RegisterSelectPage />} />
-        ) : !session ? (
-          <Route path="*" element={<OpenSessionPage />} />
         ) : (
           <>
-            <Route path="/pos" element={<POSPage />} />
             <Route path="/settings" element={<SettingsPage />} />
-            <Route path="*" element={<Navigate to="/pos" replace />} />
+            {!register ? (
+              <Route path="*" element={<RegisterSelectPage />} />
+            ) : !session ? (
+              <Route path="*" element={<OpenSessionPage />} />
+            ) : (
+              <>
+                <Route path="/pos" element={<POSPage />} />
+                <Route path="*" element={<Navigate to="/pos" replace />} />
+              </>
+            )}
           </>
         )}
       </Routes>

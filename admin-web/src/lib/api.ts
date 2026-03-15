@@ -3,6 +3,11 @@ import type { StoredAdminSession } from '../types'
 import { emitLicenseError, isLicenseErrorCode, normalizeLicenseCode } from './license'
 
 const ADMIN_SESSION_KEY = 'admin_session'
+const DEV_SERVER_PORT = '5174'
+
+function normalizeUrl(url: string): string {
+  return url.trim().replace(/\/$/, '')
+}
 
 function resolveAdminPath(path: string): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
@@ -15,17 +20,55 @@ function resolveWindowOrigin(): string {
   if (typeof window === 'undefined') return 'http://localhost:8000'
 
   const origin = window.location.origin
-  if (window.location.port === '5174') {
+  if (window.location.port === DEV_SERVER_PORT) {
     return 'http://localhost:8000'
   }
 
   return origin
 }
 
+function getStoredServerUrl(): string | null {
+  if (typeof window === 'undefined') return null
+
+  const stored = localStorage.getItem('admin_server_url')
+  if (!stored) return null
+  return normalizeUrl(stored)
+}
+
+function shouldPreferWindowOrigin(storedUrl: string | null): boolean {
+  if (typeof window === 'undefined') return storedUrl == null
+  if (window.location.port === DEV_SERVER_PORT) return false
+  if (!storedUrl) return true
+
+  try {
+    const stored = new URL(storedUrl)
+    const current = new URL(window.location.origin)
+    const loopbackHosts = new Set(['localhost', '127.0.0.1'])
+
+    if (stored.origin === current.origin) return true
+
+    // When the admin is hosted by the backend, stale local loopback URLs
+    // should not override the current server origin after a port change.
+    if (loopbackHosts.has(stored.hostname) && loopbackHosts.has(current.hostname)) {
+      return true
+    }
+
+    return false
+  } catch {
+    return true
+  }
+}
+
 function resolveBaseUrl(): string {
   const envUrl = import.meta.env.VITE_API_URL
-  if (envUrl) return envUrl
-  return localStorage.getItem('admin_server_url') || resolveWindowOrigin()
+  if (envUrl) return normalizeUrl(envUrl)
+
+  const storedUrl = getStoredServerUrl()
+  if (shouldPreferWindowOrigin(storedUrl)) {
+    return resolveWindowOrigin()
+  }
+
+  return storedUrl ?? resolveWindowOrigin()
 }
 
 const api = axios.create({
@@ -97,14 +140,21 @@ api.interceptors.response.use(
 )
 
 export function setServerUrl(url: string) {
-  localStorage.setItem('admin_server_url', url)
-  api.defaults.baseURL = `${url}/api`
+  const normalized = normalizeUrl(url)
+  localStorage.setItem('admin_server_url', normalized)
+  api.defaults.baseURL = `${resolveBaseUrl()}/api`
 }
 
 export function getServerUrl(): string {
   const envUrl = import.meta.env.VITE_API_URL
-  if (envUrl) return envUrl
-  return localStorage.getItem('admin_server_url') || resolveWindowOrigin()
+  if (envUrl) return normalizeUrl(envUrl)
+
+  const storedUrl = getStoredServerUrl()
+  if (shouldPreferWindowOrigin(storedUrl)) {
+    return resolveWindowOrigin()
+  }
+
+  return storedUrl ?? resolveWindowOrigin()
 }
 
 export default api

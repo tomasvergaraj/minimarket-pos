@@ -1,5 +1,8 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import or_
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin
@@ -16,6 +19,7 @@ from app.schemas.user import (
 )
 
 router = APIRouter(prefix="/users", tags=["users"])
+logger = logging.getLogger(__name__)
 
 
 def _find_user_by_pin(
@@ -65,8 +69,13 @@ def login_pin(data: PinLogin, db: Session = Depends(get_db)):
 
     if not is_hashed_pin(user.pin):
         user.pin = hash_pin(data.pin)
-        db.commit()
-        db.refresh(user)
+        try:
+            db.commit()
+            db.refresh(user)
+        except SQLAlchemyError:
+            db.rollback()
+            db.refresh(user)
+            logger.exception("Could not upgrade stored PIN hash during login for user %s", user.id)
 
     access_token, expires_in = create_access_token(user_id=user.id, role=user.role)
     return {

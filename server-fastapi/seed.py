@@ -24,8 +24,18 @@ def migrate():
 
     product_cols = {c["name"] for c in insp.get_columns("products")}
     sale_item_cols = {c["name"] for c in insp.get_columns("sale_items")}
+    user_cols = {c["name"]: c for c in insp.get_columns("users")}
 
     with engine.connect() as conn:
+        if "updated_at" not in user_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT NOW()"))
+            print("  + users.updated_at")
+        else:
+            pin_type = user_cols["pin"]["type"]
+            pin_length = getattr(pin_type, "length", None)
+            if pin_length is not None and pin_length < 80:
+                conn.execute(text("ALTER TABLE users ALTER COLUMN pin TYPE VARCHAR(80)"))
+                print("  ~ users.pin -> VARCHAR(80)")
         if "pack_size" not in product_cols:
             conn.execute(text("ALTER TABLE products ADD COLUMN pack_size INTEGER NOT NULL DEFAULT 1"))
             print("  + products.pack_size")

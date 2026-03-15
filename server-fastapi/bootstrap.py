@@ -27,7 +27,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--store-name", default="Nexo")
     parser.add_argument("--store-rut", default="")
     parser.add_argument("--store-address", default="")
-    parser.add_argument("--cors-origins", default="http://localhost:5174,http://127.0.0.1:5174")
+    parser.add_argument(
+        "--cors-origins",
+        default=(
+            "http://localhost:5174,"
+            "http://127.0.0.1:5174,"
+            "http://localhost:8000,"
+            "http://127.0.0.1:8000,"
+            "http://localhost:8001,"
+            "http://127.0.0.1:8001"
+        ),
+    )
     parser.add_argument("--admin-pin", default="1234")
     parser.add_argument("--cashier-pin", default="0000")
     parser.add_argument("--admin-name", default="Administrador")
@@ -74,14 +84,54 @@ def write_env(args: argparse.Namespace) -> None:
     print(f"Wrote environment file to {ENV_PATH}")
 
 
-def ensure_base_data(args: argparse.Namespace) -> None:
+def ensure_schema_current() -> None:
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import inspect as sa_inspect
+
     from app.db.base import Base
-    from app.db.session import SessionLocal, engine
-    from app.models import CashRegister, User
-    from seed import migrate, seed as seed_demo_data
+    from app.db.session import engine
+    from seed import migrate
 
     Base.metadata.create_all(bind=engine)
     migrate()
+
+    alembic_cfg = Config(str(ROOT_DIR / "alembic.ini"))
+    alembic_cfg.set_main_option("script_location", str(ROOT_DIR / "alembic"))
+    alembic_cfg.set_main_option("prepend_sys_path", str(ROOT_DIR))
+    alembic_cfg.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
+
+    inspector = sa_inspect(engine)
+    table_names = set(inspector.get_table_names())
+    if "alembic_version" in table_names:
+        command.upgrade(alembic_cfg, "head")
+        print("Alembic migrations upgraded to head.")
+        return
+
+    user_columns = {column["name"]: column for column in inspector.get_columns("users")} if "users" in table_names else {}
+    pin_column = user_columns.get("pin")
+    pin_length = getattr(pin_column["type"], "length", None) if pin_column else None
+
+    baseline_revision = "head"
+    if pin_length is not None and pin_length < 80:
+        baseline_revision = "0004"
+    elif "license_state" not in table_names:
+        baseline_revision = "0005"
+
+    command.stamp(alembic_cfg, baseline_revision)
+    if baseline_revision != "head":
+        command.upgrade(alembic_cfg, "head")
+        print(f"Alembic stamped at {baseline_revision} and upgraded to head.")
+    else:
+        print("Alembic revision stamped at head.")
+
+
+def ensure_base_data(args: argparse.Namespace) -> None:
+    from app.db.session import SessionLocal
+    from app.models import CashRegister, User
+    from seed import seed as seed_demo_data
+
+    ensure_schema_current()
 
     db = SessionLocal()
     try:

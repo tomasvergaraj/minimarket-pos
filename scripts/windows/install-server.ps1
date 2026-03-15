@@ -541,7 +541,7 @@ function Ensure-FirewallRule {
     }
 }
 
-function Ensure-AutostartTask {
+function Ensure-BackendService {
     param(
         [string]$ServerDir
     )
@@ -550,20 +550,22 @@ function Ensure-AutostartTask {
         return
     }
 
-    Write-Step "Registering startup task"
-    $taskName = "MiniMarketPOS-Server"
-    $launcher = Join-Path $ServerDir "start-service.cmd"
-    if (-not (Test-Path $launcher)) {
-        throw "Autostart launcher not found: $launcher"
-    }
-    $taskCommand = "cmd.exe /d /c `"$launcher`""
+    Write-Step "Installing backend Windows service"
+    $serviceInstaller = Join-Path $ServerDir "install_service.py"
+    $venvPython = Join-Path $ServerDir "venv\Scripts\python.exe"
 
-    schtasks /Create /F /SC ONSTART /RL HIGHEST /RU SYSTEM /TN $taskName /TR $taskCommand | Out-Null
+    if (-not (Test-Path $serviceInstaller)) {
+        throw "Service installer not found: $serviceInstaller"
+    }
+
+    if (-not (Test-Path $venvPython)) {
+        throw "Virtual environment python not found: $venvPython"
+    }
+
+    & $venvPython $serviceInstaller install | Out-Host
     if ($LASTEXITCODE -ne 0) {
-        throw "Could not create startup task."
+        throw "Could not install/start Windows service."
     }
-
-    schtasks /Run /TN $taskName | Out-Null
 }
 
 function Build-AdminWeb {
@@ -647,10 +649,11 @@ $venvPython = Ensure-Venv -PythonCommand $pythonCommand -ServerDir $serverDir
 Build-AdminWeb -RepoRoot $repoRoot -NodeDir $nodeDir
 Invoke-Bootstrap -PythonExe $venvPython -ServerDir $serverDir -DatabaseUrl $databaseUrl
 Ensure-FirewallRule -Port $ServerPort
-Ensure-AutostartTask -ServerDir $serverDir
+Ensure-BackendService -ServerDir $serverDir
 
 Write-Host ""
 Write-Host "Nexo server installation completed." -ForegroundColor Green
+Write-Host "Windows service: MiniMarketPOS-Server"
 Write-Host "API URL: http://localhost:$ServerPort"
 if (-not $SkipAdminBuild.IsPresent) {
     Write-Host "Admin URL: http://localhost:$ServerPort/admin"

@@ -38,8 +38,11 @@ echo    cd server-fastapi
 echo    venv\Scripts\activate
 echo    python run.py
 echo.
-echo  Para dejarlo con arranque automatico en Windows:
+echo  Para dejarlo como servicio de Windows:
 echo    cd server-fastapi
 echo    python install_service.py install
+echo.
+echo  El panel admin quedara disponible en:
+echo    http://localhost:8000/admin
 echo ============================================
 pause

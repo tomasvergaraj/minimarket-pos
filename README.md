@@ -1,265 +1,230 @@
 # MiniMarket POS
 
-Sistema Punto de Venta para minimarkets en Chile. Multi-caja, offline-first, con inventario, caja, reportes Excel e impresión térmica.
+Sistema Punto de Venta para minimarkets en Chile. Incluye backend FastAPI, app Electron para cajas, panel admin web y worker de sincronizacion opcional.
 
 ## Arquitectura
 
-```
-┌─────────────────┐     LAN (HTTP)     ┌─────────────────┐
-│   Caja 1        │◄──────────────────►│  PC Servidor    │
-│   Electron App  │                    │  FastAPI        │
-└─────────────────┘                    │  PostgreSQL     │
-┌─────────────────┐                    │                 │
-│   Caja 2        │◄──────────────────►│  Sync Worker    │
-│   Electron App  │                    │  (Supabase)     │
-└─────────────────┘                    └─────────────────┘
+```text
+Caja 1 (Electron) ----\
+Caja 2 (Electron) ----- LAN / HTTP ---- PC servidor
+Caja N (Electron) ----/                 - FastAPI
+                                         - PostgreSQL
+                                         - Admin web en /admin
+                                         - Sync worker opcional
 ```
 
 | Componente | Stack |
 |---|---|
 | Servidor | FastAPI + PostgreSQL + SQLAlchemy + Alembic |
-| Cliente | Electron + React + Vite + TypeScript + Tailwind |
-| Sync | Worker Python + Supabase (backup cloud opcional) |
+| Panel admin | React + Vite + TypeScript + Tailwind |
+| Cliente POS | Electron + React |
+| Sync | Worker Python + Supabase |
 
 ## Prerequisitos
 
-- **Windows 10/11**
-- **PostgreSQL 15+** corriendo en el PC servidor
-- **Python 3.11+**
-- **Node.js 18+**
+- Windows 10/11
+- PostgreSQL 15+
+- Python 3.11+
+- Node.js 20+
 
-## Instalación
+## Instalacion del servidor en Windows
 
-### 1. Base de datos
+### Opcion recomendada
+
+Usa el instalador PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\install-server.ps1 `
+  -StoreName "Almacen Don Pedro" `
+  -StoreRut "76.123.456-7" `
+  -StoreAddress "Av. Principal 123, Santiago" `
+  -AdminPin "2580" `
+  -CashierPin "1590" `
+  -RegisterCount 2 `
+  -DatabaseName "minimarket_pos" `
+  -DatabaseUser "minimarket_pos" `
+  -DatabasePassword "Cambia-Esta-Clave-2026"
+```
+
+Ese script:
+
+- eleva permisos a administrador
+- instala Python, Node.js y PostgreSQL si faltan
+- crea la base de datos y el usuario de la app
+- crea `server-fastapi/.env`
+- crea `server-fastapi/venv` e instala dependencias
+- compila `admin-web`
+- inicializa schema y datos base
+- abre en firewall el puerto configurado
+- instala el servicio Windows `MiniMarketPOS-Server`
+
+Notas:
+
+- Si PostgreSQL ya existe, pasa `-PostgresSuperPassword`.
+- Si el puerto `8000` esta ocupado, usa `-ServerPort 8001` u otro libre.
+- El panel admin no corre como servicio aparte: lo sirve el backend en `/admin`.
+
+### Instalacion manual
+
+1. Crea base de datos y usuario en PostgreSQL.
 
 ```sql
-CREATE DATABASE minimarket_pos;
+CREATE USER minimarket_pos WITH PASSWORD 'Cambia-Esta-Clave-2026';
+CREATE DATABASE minimarket_pos OWNER minimarket_pos;
 ```
 
-### 2. Servidor (PC principal)
+2. Prepara el backend.
 
-```bat
-setup-server.bat
-```
-
-O manualmente:
-
-```bash
+```powershell
 cd server-fastapi
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
-copy .env.example .env        # editar DATABASE_URL si es necesario
-python seed.py                # crea tablas + datos demo
-python run.py                 # inicia en http://0.0.0.0:8000
+venv\Scripts\python.exe bootstrap.py `
+  --database-url "postgresql://minimarket_pos:Cambia-Esta-Clave-2026@localhost:5432/minimarket_pos" `
+  --server-port 8000 `
+  --store-name "Nexo" `
+  --admin-pin "1234" `
+  --cashier-pin "0000" `
+  --register-count 3 `
+  --overwrite-env
 ```
 
-### InstalaciÃ³n automÃ¡tica Windows (servidor)
+3. Compila el panel admin.
 
-Primera versiÃ³n de instalador automatizado:
-
-```bat
-scripts\windows\install-server.cmd
+```powershell
+cd ..\admin-web
+npm install
+npm run build
 ```
 
-QuÃ© hace:
+4. Instala el servicio Windows.
 
-- eleva permisos a administrador
-- instala Python 3.11+ con `winget` si falta
-- instala PostgreSQL con `winget` si falta
-- crea usuario y base de datos de la app
-- crea/actualiza `server-fastapi/.env`
-- inicializa schema y datos base del sistema
-- abre el puerto `8000` en firewall
-- registra una tarea de inicio automÃ¡tico para el backend
-
-Notas:
-
-- si PostgreSQL ya estÃ¡ instalado, debes pasar `-PostgresSuperPassword` al script PowerShell
-- por defecto crea sÃ³lo datos base (admin, cajero, cajas); agrega `-WithDemoData` si quieres catÃ¡logo demo
-- usa `server-fastapi/serve.py` para arranque sin `reload`
-
-### 3. Cliente (cada caja)
-
-```bat
-setup-client.bat
+```powershell
+cd ..\server-fastapi
+venv\Scripts\python.exe install_service.py install
 ```
 
-O manualmente:
+## Operacion del servicio Windows
 
-```bash
+El backend usa un servicio Windows nativo llamado `MiniMarketPOS-Server`.
+
+```powershell
+cd server-fastapi
+venv\Scripts\python.exe install_service.py status
+venv\Scripts\python.exe install_service.py start
+venv\Scripts\python.exe install_service.py stop
+venv\Scripts\python.exe install_service.py restart
+venv\Scripts\python.exe install_service.py uninstall
+```
+
+Puntos importantes:
+
+- Ejecuta `install`, `start`, `stop`, `restart` y `uninstall` desde una terminal con privilegios de administrador.
+- El servicio elimina la tarea programada legacy si todavia existe.
+- El panel admin queda disponible en `http://localhost:<puerto>/admin`.
+- El log del host queda en `server-fastapi/logs/windows-service-host.log`.
+
+## Instalacion del cliente POS
+
+En cada caja puedes usar el instalador compilado o construirlo manualmente.
+
+```powershell
 cd client-electron-pos
 npm install
-npm run electron:dev          # desarrollo
-npm run electron:build        # genera instalador .exe
-```
-
-### 4. Configurar IP del servidor en cada caja
-
-Al iniciar la app, click en **"Configurar servidor"** e ingresar la IP LAN del PC servidor:
-
-```
-http://192.168.1.100:8000
-```
-
-## Uso
-
-### Login
-
-- **Admin:** PIN `1234`
-- **Cajero 1:** PIN `0000`
-
-### Atajos de teclado
-
-| Tecla | Acción |
-|---|---|
-| F2 | Enfocar barra de búsqueda |
-| F4 | Abrir cobro |
-| ESC | Cerrar modales |
-
-### Flujo de caja
-
-1. Login con PIN
-2. Seleccionar caja (Caja 1, 2, 3)
-3. Abrir sesión con monto inicial
-4. Vender (escanear barcode o buscar productos)
-5. Cobrar (efectivo / tarjeta / mixto)
-6. Cerrar caja → cuadre automático
-
-### Lector de código de barras
-
-El lector USB funciona como emulación de teclado. Al escanear un código, el sistema busca por barcode y agrega el producto al carrito automáticamente.
-
-## API Endpoints
-
-```
-GET    /api/health
-GET    /api/products/                  # listar productos
-GET    /api/products/barcode/{code}    # buscar por barcode
-POST   /api/products/                  # crear producto
-PUT    /api/products/{id}              # actualizar producto
-
-POST   /api/sales/                     # registrar venta
-GET    /api/sales/{id}                 # ver venta
-POST   /api/sales/{id}/void           # anular venta
-
-GET    /api/cash/registers             # listar cajas
-POST   /api/cash/sessions/open         # abrir sesión
-POST   /api/cash/sessions/{id}/close   # cerrar sesión
-GET    /api/cash/sessions/active       # sesiones activas
-
-POST   /api/kardex/                    # movimiento inventario
-GET    /api/kardex/product/{id}        # historial producto
-
-GET    /api/reports/sales.xlsx?date_from=...&date_to=...
-GET    /api/reports/inventory.xlsx
-
-POST   /api/users/login/pin            # login por PIN
-GET    /api/users/                     # listar usuarios
-
-GET    /api/tax/sii/status             # estado SII (placeholder)
-```
-
-## Datos demo (seed)
-
-El script `seed.py` crea:
-
-- 2 usuarios (admin + cajero)
-- 3 cajas registradoras
-- 10 productos de ejemplo (bebidas, snacks, lácteos, limpieza, abarrotes)
-
-## Generar instalador .exe
-
-```bash
-cd client-electron-pos
 npm run electron:build
 ```
 
-El instalador se genera en `client-electron-pos/dist-electron/`.
+El instalador queda en `client-electron-pos/dist-electron/`.
 
-## Auto-update
+Al iniciar la app:
 
-Configurado con `electron-updater`. Publica releases en GitHub y la app se actualiza automáticamente. Editar `build.publish` en `package.json` con tu usuario/repo de GitHub.
+1. Pulsa `Configurar servidor`.
+2. Ingresa `http://IP_DEL_SERVIDOR:<puerto>`.
+3. Inicia sesion con PIN.
+4. Selecciona la caja.
 
-## Instalar backend con arranque automático en Windows
+## URLs utiles
 
-Usa el Programador de tareas de Windows; no requiere NSSM ni software extra.
+- Health: `http://localhost:<puerto>/api/health`
+- Admin: `http://localhost:<puerto>/admin`
+- Admin desde LAN: `http://IP_DEL_SERVIDOR:<puerto>/admin`
 
-```bash
-cd server-fastapi
-python install_service.py install
-python install_service.py status
-python install_service.py restart
-python install_service.py uninstall
+Si no cambias `-ServerPort`, el puerto por defecto es `8000`.
+
+## Credenciales iniciales
+
+- Admin: PIN definido en la instalacion
+- Cajero base: PIN definido en la instalacion
+- Usuario interno admin: `admin`
+- Usuario interno cajero base: `cajero1`
+
+## API principal
+
+```text
+GET    /api/health
+GET    /api/products/
+POST   /api/products/
+PUT    /api/products/{id}
+
+POST   /api/sales/
+GET    /api/sales/{id}
+POST   /api/sales/{id}/void
+
+GET    /api/cash/registers
+GET    /api/cash/sessions
+POST   /api/cash/sessions/open
+POST   /api/cash/sessions/{id}/close
+
+POST   /api/kardex/
+GET    /api/kardex/product/{id}
+
+GET    /api/reports/sales.xlsx
+GET    /api/reports/inventory.xlsx
+
+POST   /api/users/login/pin
+GET    /api/users/
 ```
 
-Notas:
+## Sync cloud opcional
 
-- ejecutar desde una terminal con privilegios de administrador
-- registra la tarea `MiniMarketPOS-Server`
-- arranca `server-fastapi/start-service.cmd`, que usa `venv\Scripts\python.exe` y `serve.py`
+Configura en `server-fastapi/.env`:
 
-## Sync cloud (Supabase)
-
-Configurar en `.env`:
-
-```
+```env
 SUPABASE_URL=https://xxx.supabase.co
 SUPABASE_KEY=eyJ...
 ```
 
-Iniciar worker:
+Luego ejecuta:
 
-```bash
+```powershell
 cd sync-worker
 pip install -r requirements.txt
 python sync.py
 ```
 
-Sincroniza cada 30 minutos cuando hay internet.
-
 ## Estructura del proyecto
 
-```
+```text
 minimarket-pos/
-├── server-fastapi/
-│   ├── app/
-│   │   ├── api/routes/        # endpoints REST
-│   │   ├── core/              # configuración
-│   │   ├── db/                # engine + session
-│   │   ├── models/            # SQLAlchemy models
-│   │   ├── schemas/           # Pydantic schemas
-│   │   ├── services/          # lógica de negocio
-│   │   └── tax/sii/           # placeholder SII
-│   ├── alembic/               # migraciones DB
-│   ├── seed.py                # datos iniciales
-│   ├── run.py                 # iniciar servidor
-│   └── install_service.py     # servicio Windows
-├── client-electron-pos/
-│   ├── electron/              # main + preload
-│   ├── src/
-│   │   ├── pages/             # Login, POS, Settings
-│   │   ├── components/        # PaymentModal, ReceiptView
-│   │   ├── stores/            # Zustand (auth, cart)
-│   │   ├── services/          # API client, printer
-│   │   └── types/             # TypeScript interfaces
-│   └── package.json           # electron-builder config
-├── sync-worker/               # sync Supabase
-├── setup-server.bat
-├── setup-client.bat
-└── start-server.bat
+  server-fastapi/
+    app/
+    alembic/
+    install_service.py
+    NexoBackendServiceHost.cs
+    seed.py
+  admin-web/
+  client-electron-pos/
+  sync-worker/
+  scripts/windows/install-server.ps1
+  setup-server.bat
+  setup-client.bat
 ```
 
-## Notas técnicas
+## Notas tecnicas
 
-- **Multi-caja seguro:** Locks con `SELECT ... FOR UPDATE` en PostgreSQL para stock y sesiones de caja
-- **IVA Chile 19%:** Incluido en precio de venta, extraído con `tax = subtotal × 19 / 119`
-- **UUIDs:** Todas las PKs son UUID strings para evitar colisiones entre cajas
-- **Impresión térmica:** ESC/POS 80mm vía `electron-pos-printer` (IPC desde renderer)
-
-## Pendiente / Roadmap
-
-- [ ] Boleta electrónica SII (requiere certificado digital + CAF)
-- [ ] WhatsApp Business Cloud API para reportes diarios
-- [ ] Alembic migrations auto-generadas
-- [ ] Supabase schema mirroring completo
+- Multi-caja seguro con locks en PostgreSQL.
+- IVA Chile 19% incluido en precio de venta.
+- Todas las PKs usan UUID.
+- El admin web compilado se sirve desde el backend.
+- El login de admin y POS es por PIN.

@@ -211,8 +211,25 @@ Que hace este script:
 - crea `venv` e instala dependencias del backend
 - compila `admin-web`
 - inicializa tablas y datos base
-- abre puerto 8000 en firewall
-- registra tarea de inicio automatico `MiniMarketPOS-Server`
+- abre en firewall el puerto indicado en `-ServerPort` (por defecto `8000`)
+- instala el servicio Windows `MiniMarketPOS-Server`
+- deja el panel admin servido por el mismo backend en `/admin`
+
+Si el puerto `8000` ya esta ocupado, por ejemplo por Docker, puedes instalar Nexo en otro puerto:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\install-server.ps1 `
+  -StoreName "Almacen Don Pedro" `
+  -StoreRut "76.123.456-7" `
+  -StoreAddress "Av. Principal 123, Santiago" `
+  -AdminPin "2580" `
+  -CashierPin "1590" `
+  -RegisterCount 2 `
+  -DatabaseName "minimarket_pos" `
+  -DatabaseUser "minimarket_pos" `
+  -DatabasePassword "Cambia-Esta-Clave-2026" `
+  -ServerPort 8001
+```
 
 ### 5.3. Parametros comerciales que debes ajustar siempre
 
@@ -222,6 +239,7 @@ No dejes los defaults sin revisar:
 - `-AdminPin`: no dejes `1234` en cliente real.
 - `-CashierPin`: no dejes `0000` en cliente real.
 - `-StoreName`, `-StoreRut`, `-StoreAddress`: pon los datos reales.
+- `-ServerPort`: usa `8001` u otro puerto libre si `8000` ya esta tomado.
 
 Si quieres productos demo para capacitacion:
 
@@ -286,6 +304,23 @@ cd server-fastapi
 venv\Scripts\python.exe install_service.py install
 ```
 
+Ese servicio Windows tambien deja disponible el panel admin en `http://localhost:<puerto>/admin`.
+No se instala un proceso aparte para admin web.
+
+Comandos utiles del servicio:
+
+```powershell
+cd server-fastapi
+venv\Scripts\python.exe install_service.py status
+venv\Scripts\python.exe install_service.py restart
+venv\Scripts\python.exe install_service.py stop
+venv\Scripts\python.exe install_service.py uninstall
+```
+
+Log del host Windows:
+
+- `server-fastapi/logs/windows-service-host.log`
+
 7. Luego continua con la seccion 6 de esta guia para ajustar licencias, SII y extras.
 
 ## 6. Ajustes obligatorios despues de instalar el servidor
@@ -339,9 +374,11 @@ venv\Scripts\python.exe install_service.py restart
 
 Comprueba esto antes de instalar cajas:
 
-- API: `http://localhost:8000/api/health`
-- Panel admin: `http://localhost:8000/admin`
-- En red LAN: `http://IP_DEL_SERVIDOR:8000/admin`
+- API: `http://localhost:<puerto>/api/health`
+- Panel admin: `http://localhost:<puerto>/admin`
+- En red LAN: `http://IP_DEL_SERVIDOR:<puerto>/admin`
+
+`<puerto>` es el que definiste en `-ServerPort`. Si no cambiaste nada, sera `8000`.
 
 Credenciales iniciales:
 
@@ -358,7 +395,7 @@ En cada PC caja:
 1. Instala `Nexo-Setup-<version>.exe`.
 2. Abre Nexo.
 3. En la pantalla de login, pulsa `Configurar servidor`.
-4. Ingresa `http://IP_DEL_SERVIDOR:8000`.
+4. Ingresa `http://IP_DEL_SERVIDOR:<puerto>`.
 5. Inicia sesion con PIN de admin o cajero.
 6. Selecciona la caja correspondiente.
 7. En `Configuracion`, elige la impresora termica.
@@ -369,6 +406,7 @@ Notas importantes:
 - El cliente POS guarda la URL del servidor en localStorage.
 - Si no cambias la URL, por defecto intentara usar `http://localhost:8000`.
 - Cada caja debe apuntar al PC servidor del cliente, no a tu notebook.
+- Si moviste el backend a `8001`, recuerda usar ese mismo puerto en admin y en cada caja.
 
 ## 9. Flujo correcto para vender licencias offline
 
@@ -543,8 +581,8 @@ Si no lo ajustas, la app buscara releases en ese repositorio configurado.
 
 Antes de cerrar la instalacion verifica:
 
-- backend responde en `http://IP_DEL_SERVIDOR:8000/api/health`
-- panel admin abre en `http://IP_DEL_SERVIDOR:8000/admin`
+- backend responde en `http://IP_DEL_SERVIDOR:<puerto>/api/health`
+- panel admin abre en `http://IP_DEL_SERVIDOR:<puerto>/admin`
 - licencia activada y estado `licensed`
 - cantidad de cajas creada coincide con lo vendido
 - cada caja apunta al servidor correcto
@@ -570,7 +608,7 @@ cd server-fastapi
 venv\Scripts\python.exe install_service.py restart
 ```
 
-Ver estado de la tarea Windows:
+Ver estado del servicio Windows:
 
 ```powershell
 cd server-fastapi

@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from app.api.deps import require_admin
 from app.core.config import ROOT_DIR, settings
@@ -14,6 +14,41 @@ app = FastAPI(title="Nexo Server", version="1.0.0")
 
 ADMIN_DIST_DIR = ROOT_DIR.parent / "admin-web" / "dist"
 ADMIN_INDEX_FILE = ADMIN_DIST_DIR / "index.html"
+ADMIN_INDEX_HEADERS = {
+    "Cache-Control": "no-store, no-cache, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+ADMIN_COMPAT_PATHS = (
+    "login",
+    "products",
+    "sales",
+    "inventory",
+    "cash",
+    "users",
+    "reports",
+    "config",
+)
+ADMIN_COMPAT_STORAGE_RESET_SCRIPT = """
+(() => {
+  try {
+    const stored = localStorage.getItem('admin_server_url');
+    if (!stored) return;
+
+    const storedUrl = new URL(stored, window.location.origin);
+    const currentUrl = new URL(window.location.origin);
+    const loopbackHosts = new Set(['localhost', '127.0.0.1']);
+
+    if (
+      loopbackHosts.has(storedUrl.hostname) &&
+      loopbackHosts.has(currentUrl.hostname) &&
+      storedUrl.origin !== currentUrl.origin
+    ) {
+      localStorage.removeItem('admin_server_url');
+    }
+  } catch {}
+})();
+""".strip()
 
 allowed_origins = [
     origin.strip()
@@ -93,6 +128,61 @@ def _resolve_admin_asset(full_path: str) -> Path | None:
 
 
 @app.get("/admin", include_in_schema=False)
+def redirect_admin_web_root():
+    return RedirectResponse(url="/admin/", status_code=307, headers=ADMIN_INDEX_HEADERS)
+
+
+def _redirect_admin_path(path: str) -> RedirectResponse:
+    target = path.lstrip("/")
+    suffix = f"/{target}" if target else "/"
+    return RedirectResponse(url=f"/admin{suffix}", status_code=307, headers=ADMIN_INDEX_HEADERS)
+
+
+def _render_admin_compat_page(path: str) -> HTMLResponse:
+    target = path.lstrip("/")
+    suffix = f"/{target}" if target else "/"
+    admin_url = f"/admin{suffix}"
+    html = f"""<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="refresh" content="0; url={admin_url}" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Redirecting to Nexo Admin</title>
+  </head>
+  <body>
+    <script>
+{ADMIN_COMPAT_STORAGE_RESET_SCRIPT}
+window.location.replace({admin_url!r});
+    </script>
+    <p>Redirecting to <a href="{admin_url}">{admin_url}</a>...</p>
+  </body>
+</html>
+"""
+    return HTMLResponse(content=html, headers=ADMIN_INDEX_HEADERS)
+
+
+@app.get("/login", include_in_schema=False)
+@app.get("/products", include_in_schema=False)
+@app.get("/sales", include_in_schema=False)
+@app.get("/inventory", include_in_schema=False)
+@app.get("/cash", include_in_schema=False)
+@app.get("/users", include_in_schema=False)
+@app.get("/reports", include_in_schema=False)
+@app.get("/config", include_in_schema=False)
+def redirect_admin_compat_routes(request: Request):
+    path = request.url.path.lstrip("/")
+    if path not in ADMIN_COMPAT_PATHS:
+        raise HTTPException(status_code=404, detail="Not found")
+    return _render_admin_compat_page(path)
+
+
+@app.get("/vite.svg", include_in_schema=False)
+def redirect_legacy_admin_icon():
+    return RedirectResponse(url="/admin/icon.svg", status_code=307, headers=ADMIN_INDEX_HEADERS)
+
+
+@app.get("/admin/", include_in_schema=False)
 @app.get("/admin/{full_path:path}", include_in_schema=False)
 def serve_admin_web(full_path: str = ""):
     target = _resolve_admin_asset(full_path)
@@ -100,4 +190,5 @@ def serve_admin_web(full_path: str = ""):
         if not ADMIN_INDEX_FILE.exists():
             raise HTTPException(status_code=404, detail="Admin web is not built")
         raise HTTPException(status_code=404, detail="Admin asset not found")
-    return FileResponse(target)
+    headers = ADMIN_INDEX_HEADERS if target == ADMIN_INDEX_FILE else None
+    return FileResponse(target, headers=headers)

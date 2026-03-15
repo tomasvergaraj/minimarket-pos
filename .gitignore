@@ -10,8 +10,10 @@ out/
 dist-electron/
 *.exe
 *.db
+*.log
 .DS_Store
 
 # Local secrets and issued licenses
 secrets/
 licenses/
+server-fastapi/logs/

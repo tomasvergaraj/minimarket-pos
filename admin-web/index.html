@@ -4,6 +4,27 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      ;(() => {
+        try {
+          const stored = localStorage.getItem('admin_server_url')
+          if (!stored) return
+
+          const storedUrl = new URL(stored, window.location.origin)
+          const currentUrl = new URL(window.location.origin)
+          const loopbackHosts = new Set(['localhost', '127.0.0.1'])
+
+          if (
+            window.location.pathname.startsWith('/admin') &&
+            loopbackHosts.has(storedUrl.hostname) &&
+            loopbackHosts.has(currentUrl.hostname) &&
+            storedUrl.origin !== currentUrl.origin
+          ) {
+            localStorage.removeItem('admin_server_url')
+          }
+        } catch {}
+      })()
+    </script>
     <title>Nexo Admin</title>
   </head>
   <body>

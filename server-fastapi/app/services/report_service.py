@@ -26,11 +26,12 @@ def generate_sales_report(db: Session, date_from: date, date_to: date) -> BytesI
 
     for sale in sales:
         products_str = "; ".join(f"{i.product_name} x{i.quantity}" for i in sale.items)
+        net_subtotal = round(float(sale.total) - float(sale.tax_amount), 2)
         ws.append([
             sale.sale_number,
             sale.created_at.strftime("%Y-%m-%d %H:%M"),
             sale.payment_method.value,
-            float(sale.subtotal),
+            net_subtotal,
             float(sale.tax_amount),
             float(sale.total),
             sale.status.value,

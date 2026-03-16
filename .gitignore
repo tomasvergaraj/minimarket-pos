@@ -17,3 +17,6 @@ dist-electron/
 secrets/
 licenses/
 server-fastapi/logs/
+
+# Generated delivery bundles
+deploy/output/

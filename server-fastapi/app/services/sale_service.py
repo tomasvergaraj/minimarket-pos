@@ -19,7 +19,7 @@ def create_sale(db: Session, data: SaleCreate) -> tuple[Sale, bytes | None]:
 
     max_num = db.query(func.max(Sale.sale_number)).scalar() or 0
 
-    subtotal = 0.0
+    gross_subtotal = 0.0
     tax_total = 0.0
     sale_items: list[SaleItem] = []
 
@@ -55,8 +55,8 @@ def create_sale(db: Session, data: SaleCreate) -> tuple[Sale, bytes | None]:
         else:
             unit_price = float(product.sell_price)
 
-        line_subtotal = unit_price * item_data.quantity
-        line_tax = round(line_subtotal * float(product.tax_rate) / (100 + float(product.tax_rate)), 2)
+        line_total = unit_price * item_data.quantity
+        line_tax = round(line_total * float(product.tax_rate) / (100 + float(product.tax_rate)), 2)
 
         sale_item = SaleItem(
             product_id=product.id,
@@ -64,13 +64,13 @@ def create_sale(db: Session, data: SaleCreate) -> tuple[Sale, bytes | None]:
             product_sku=product.sku,
             quantity=item_data.quantity,
             unit_price=unit_price,
-            subtotal=line_subtotal,
+            subtotal=line_total,
             tax_rate=float(product.tax_rate),
             tax_amount=line_tax,
             units_per_item=int(product.units_contained) if product.is_pack else 1,
         )
         sale_items.append(sale_item)
-        subtotal += line_subtotal
+        gross_subtotal += line_total
         tax_total += line_tax
 
         stock_before = stock_product.stock
@@ -86,7 +86,8 @@ def create_sale(db: Session, data: SaleCreate) -> tuple[Sale, bytes | None]:
         )
         db.add(kardex)
 
-    total = subtotal
+    subtotal = round(gross_subtotal - tax_total, 2)
+    total = round(gross_subtotal, 2)
     change = 0.0
 
     payment = PaymentMethod(data.payment_method)

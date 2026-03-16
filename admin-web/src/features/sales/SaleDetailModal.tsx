@@ -12,6 +12,7 @@ interface SaleDetailModalProps {
 
 export default function SaleDetailModal({ open, onClose, sale }: SaleDetailModalProps) {
   if (!sale) return null
+  const netSubtotal = Math.max(sale.total - sale.tax_amount, 0)
 
   return (
     <Modal open={open} onClose={onClose} title={`Venta #${sale.sale_number}`} size="lg">
@@ -51,7 +52,7 @@ export default function SaleDetailModal({ open, onClose, sale }: SaleDetailModal
                 <th className="py-1.5 text-left text-caption text-text-muted font-medium">Producto</th>
                 <th className="py-1.5 text-right text-caption text-text-muted font-medium">Cant.</th>
                 <th className="py-1.5 text-right text-caption text-text-muted font-medium">P. Unit.</th>
-                <th className="py-1.5 text-right text-caption text-text-muted font-medium">Subtotal</th>
+                <th className="py-1.5 text-right text-caption text-text-muted font-medium">Total linea</th>
               </tr>
             </thead>
             <tbody>
@@ -78,7 +79,7 @@ export default function SaleDetailModal({ open, onClose, sale }: SaleDetailModal
         <div className="border-t border-border pt-3 space-y-1.5 text-[13px]">
           <div className="flex justify-between">
             <span className="text-text-muted">Subtotal</span>
-            <span className="tabular-nums">{formatCLP(sale.subtotal)}</span>
+            <span className="tabular-nums">{formatCLP(netSubtotal)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-text-muted">IVA</span>

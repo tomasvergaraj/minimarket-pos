@@ -193,27 +193,73 @@ export async function voidSale(id: string): Promise<void> {
 
 // ── Cash ──
 
-export async function fetchRegisters(): Promise<CashRegister[]> {
+interface FetchRegistersParams {
+  includeInactive?: boolean
+}
+
+export async function fetchRegisters(
+  params: FetchRegistersParams = {}
+): Promise<CashRegister[]> {
   if (USE_MOCKS) {
     await delay(200)
-    return [...mockRegisters]
+    const result = [...mockRegisters]
+    return params.includeInactive ? result : result.filter((register) => register.is_active)
   }
-  const res = await api.get('/cash/registers')
+  const res = await api.get('/cash/registers', {
+    params: {
+      include_inactive: params.includeInactive ? true : undefined,
+    },
+  })
   return res.data.data ?? res.data
 }
 
 export async function createRegister(name: string): Promise<CashRegister> {
   if (USE_MOCKS) {
     await delay()
-    return {
+    const register: CashRegister = {
       id: `r-${Date.now()}`,
       name,
       is_active: true,
       created_at: new Date().toISOString(),
     }
+    mockRegisters.push(register)
+    return register
   }
   const res = await api.post('/cash/registers', { name })
   return res.data.data ?? res.data
+}
+
+export async function updateRegister(
+  id: string,
+  data: { name?: string; is_active?: boolean }
+): Promise<CashRegister> {
+  if (USE_MOCKS) {
+    await delay()
+    const index = mockRegisters.findIndex((register) => register.id === id)
+    if (index === -1) {
+      throw new Error('Caja no encontrada')
+    }
+
+    mockRegisters[index] = {
+      ...mockRegisters[index],
+      ...data,
+    }
+    return mockRegisters[index]
+  }
+  const res = await api.put(`/cash/registers/${id}`, data)
+  return res.data.data ?? res.data
+}
+
+export async function deleteRegister(id: string): Promise<void> {
+  if (USE_MOCKS) {
+    await delay()
+    const index = mockRegisters.findIndex((register) => register.id === id)
+    if (index >= 0) {
+      mockRegisters.splice(index, 1)
+    }
+    return
+  }
+  await api.delete(`/cash/registers/${id}`)
 }
 
 interface FetchSessionsParams {

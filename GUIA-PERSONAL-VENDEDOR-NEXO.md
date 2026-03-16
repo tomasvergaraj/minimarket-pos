@@ -111,6 +111,30 @@ Nexo-Ventas/
       datos-comerciales.txt
 ```
 
+### 2.6. Generar un paquete limpio para entregar
+
+Ahora el repo tiene un armado `deploy/` para separar lo que si va al cliente de lo que no.
+
+Comando:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\deploy\prepare-delivery.ps1 -CustomerName "Don Pedro"
+```
+
+Si vendiste backup cloud:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\deploy\prepare-delivery.ps1 -CustomerName "Don Pedro" -IncludeSyncWorker
+```
+
+Salida:
+
+- `deploy/output/<cliente>-<fecha>/servidor`
+- `deploy/output/<cliente>-<fecha>/cajas`
+- `deploy/output/<cliente>-<fecha>/updates`
+
+Esto te deja una entrega limpia sin `.git`, sin `secrets/`, sin `licenses/` y sin el codigo fuente completo del cliente Electron.
+
 ## 3. Datos y archivos que debes pedir/reunir por cliente
 
 Antes de instalar, junta esto:

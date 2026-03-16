@@ -214,6 +214,7 @@ export const mockProducts: Product[] = [
 export const mockRegisters: CashRegister[] = [
   { id: 'r-001', name: 'Caja 1', is_active: true, created_at: '2026-01-10T08:00:00' },
   { id: 'r-002', name: 'Caja 2', is_active: true, created_at: '2026-01-10T08:00:00' },
+  { id: 'r-003', name: 'Caja 3', is_active: false, created_at: '2026-01-18T08:00:00' },
 ]
 
 // Cash Sessions
@@ -275,7 +276,7 @@ export const mockSales: Sale[] = [
     cash_session_id: 's-001',
     register_id: 'r-001',
     seller_id: 'u-002',
-    subtotal: 4960,
+    subtotal: 4167,
     tax_amount: 793,
     total: 4960,
     payment_method: 'cash',
@@ -326,7 +327,7 @@ export const mockSales: Sale[] = [
     cash_session_id: 's-001',
     register_id: 'r-001',
     seller_id: 'u-002',
-    subtotal: 11990,
+    subtotal: 10076,
     tax_amount: 1914,
     total: 11990,
     payment_method: 'card',
@@ -377,7 +378,7 @@ export const mockSales: Sale[] = [
     cash_session_id: 's-002',
     register_id: 'r-002',
     seller_id: 'u-003',
-    subtotal: 3370,
+    subtotal: 2832,
     tax_amount: 538,
     total: 3370,
     payment_method: 'cash',
@@ -417,7 +418,7 @@ export const mockSales: Sale[] = [
     cash_session_id: 's-003',
     register_id: 'r-001',
     seller_id: 'u-002',
-    subtotal: 7550,
+    subtotal: 6344,
     tax_amount: 1206,
     total: 7550,
     payment_method: 'mixed',
@@ -468,7 +469,7 @@ export const mockSales: Sale[] = [
     cash_session_id: 's-003',
     register_id: 'r-001',
     seller_id: 'u-002',
-    subtotal: 2380,
+    subtotal: 2000,
     tax_amount: 380,
     total: 2380,
     payment_method: 'cash',

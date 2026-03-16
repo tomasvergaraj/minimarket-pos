@@ -8,6 +8,11 @@ class CashRegisterCreate(BaseModel):
     name: str
 
 
+class CashRegisterUpdate(BaseModel):
+    name: str | None = None
+    is_active: bool | None = None
+
+
 class CashRegisterOut(BaseModel):
     id: str
     name: str

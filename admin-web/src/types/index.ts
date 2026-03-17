@@ -170,9 +170,10 @@ export interface Sale {
   subtotal: number
   tax_amount: number
   total: number
-  payment_method: 'cash' | 'card' | 'mixed'
+  payment_method: 'cash' | 'card' | 'transfer' | 'mixed'
   cash_amount: number
   card_amount: number
+  transfer_amount: number
   change_amount: number
   status: 'completed' | 'voided'
   created_at: string

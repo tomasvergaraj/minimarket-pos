@@ -27,7 +27,16 @@ export default function ReceiptView({ sale, onClose }: Props) {
       })),
       { type: "text", value: "--------------------------------", style: { textAlign: "center" } },
       { type: "text", value: `TOTAL: ${formatCLP(sale.total)}`, style: { textAlign: "right", fontWeight: "700", fontSize: "14px" } },
-      { type: "text", value: `Pago: ${sale.payment_method}`, style: { fontSize: "10px" } },
+      { type: "text", value: `Pago: ${sale.payment_method === "cash" ? "Efectivo" : sale.payment_method === "card" ? "Tarjeta" : sale.payment_method === "transfer" ? "Transferencia" : "Mixto"}`, style: { fontSize: "10px" } },
+      ...(sale.cash_amount > 0 && sale.payment_method !== "cash"
+        ? [{ type: "text" as const, value: `  Efectivo: ${formatCLP(sale.cash_amount)}`, style: { fontSize: "10px" } }]
+        : []),
+      ...(sale.card_amount > 0 && sale.payment_method !== "card"
+        ? [{ type: "text" as const, value: `  Tarjeta: ${formatCLP(sale.card_amount)}`, style: { fontSize: "10px" } }]
+        : []),
+      ...(sale.transfer_amount > 0
+        ? [{ type: "text" as const, value: `  Transferencia: ${formatCLP(sale.transfer_amount)}`, style: { fontSize: "10px" } }]
+        : []),
       ...(sale.change_amount > 0
         ? [{ type: "text" as const, value: `Vuelto: ${formatCLP(sale.change_amount)}`, style: { fontSize: "11px" } }]
         : []),
@@ -72,9 +81,10 @@ export default function ReceiptView({ sale, onClose }: Props) {
       </div>
 
       <div className="text-sm text-gray-500 space-y-1 mb-4">
-        <p>Pago: {sale.payment_method === "cash" ? "Efectivo" : sale.payment_method === "card" ? "Tarjeta" : "Mixto"}</p>
+        <p>Pago: {sale.payment_method === "cash" ? "Efectivo" : sale.payment_method === "card" ? "Tarjeta" : sale.payment_method === "transfer" ? "Transferencia" : "Mixto"}</p>
         {sale.cash_amount > 0 && <p>Efectivo: {formatCLP(sale.cash_amount)}</p>}
         {sale.card_amount > 0 && <p>Tarjeta: {formatCLP(sale.card_amount)}</p>}
+        {sale.transfer_amount > 0 && <p>Transferencia: {formatCLP(sale.transfer_amount)}</p>}
         {sale.change_amount > 0 && <p className="text-green-600 font-medium">Vuelto: {formatCLP(sale.change_amount)}</p>}
       </div>
 

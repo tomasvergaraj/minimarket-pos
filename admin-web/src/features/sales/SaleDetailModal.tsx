@@ -89,7 +89,25 @@ export default function SaleDetailModal({ open, onClose, sale }: SaleDetailModal
             <span>Total</span>
             <span className="tabular-nums">{formatCLP(sale.total)}</span>
           </div>
-          {sale.payment_method === 'cash' && sale.change_amount > 0 && (
+          {sale.cash_amount > 0 && sale.payment_method !== 'cash' && (
+            <div className="flex justify-between text-text-muted">
+              <span>Efectivo</span>
+              <span className="tabular-nums">{formatCLP(sale.cash_amount)}</span>
+            </div>
+          )}
+          {sale.card_amount > 0 && sale.payment_method !== 'card' && (
+            <div className="flex justify-between text-text-muted">
+              <span>Tarjeta</span>
+              <span className="tabular-nums">{formatCLP(sale.card_amount)}</span>
+            </div>
+          )}
+          {sale.transfer_amount > 0 && (
+            <div className="flex justify-between text-text-muted">
+              <span>Transferencia</span>
+              <span className="tabular-nums">{formatCLP(sale.transfer_amount)}</span>
+            </div>
+          )}
+          {sale.change_amount > 0 && (
             <div className="flex justify-between text-text-muted">
               <span>Vuelto</span>
               <span className="tabular-nums">{formatCLP(sale.change_amount)}</span>

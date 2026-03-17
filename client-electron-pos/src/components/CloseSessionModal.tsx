@@ -60,6 +60,12 @@ export default function CloseSessionModal({ onClose }: Props) {
               <span className="text-gray-600">Ventas tarjeta</span>
               <span className="font-medium">{formatCLP(result.total_card_sales)}</span>
             </div>
+            {(result.total_transfer_sales ?? 0) > 0 && (
+              <div className="flex justify-between">
+                <span className="text-gray-600">Ventas transferencia</span>
+                <span className="font-medium">{formatCLP(result.total_transfer_sales)}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-gray-600">Total ventas</span>
               <span className="font-medium">{result.total_sales_count}</span>
@@ -107,6 +113,9 @@ export default function CloseSessionModal({ onClose }: Props) {
           <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm space-y-1">
             <p>Ventas efectivo: <strong>{formatCLP(session.total_cash_sales)}</strong></p>
             <p>Ventas tarjeta: <strong>{formatCLP(session.total_card_sales)}</strong></p>
+            {(session.total_transfer_sales ?? 0) > 0 && (
+              <p>Ventas transferencia: <strong>{formatCLP(session.total_transfer_sales)}</strong></p>
+            )}
             <p>Cant. ventas: <strong>{session.total_sales_count}</strong></p>
           </div>
         )}

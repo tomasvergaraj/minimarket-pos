@@ -86,6 +86,7 @@ export interface CashSession {
   closing_amount: number | null;
   total_cash_sales: number;
   total_card_sales: number;
+  total_transfer_sales: number;
   total_sales_count: number;
   expected_cash: number | null;
   difference: number | null;

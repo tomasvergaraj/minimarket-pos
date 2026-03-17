@@ -52,6 +52,12 @@ export default function SessionDetailModal({ open, onClose, session, registerNam
             <span className="text-text-muted">Ventas tarjeta</span>
             <span className="tabular-nums">{formatCLP(session.total_card_sales)}</span>
           </div>
+          {(session.total_transfer_sales ?? 0) > 0 && (
+            <div className="flex justify-between">
+              <span className="text-text-muted">Ventas transferencia</span>
+              <span className="tabular-nums">{formatCLP(session.total_transfer_sales)}</span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span className="text-text-muted">Total ventas</span>
             <span className="font-medium tabular-nums">{session.total_sales_count}</span>

@@ -116,7 +116,7 @@ export default function CashPage() {
       header: 'Total Ventas',
       render: (row) => (
         <span className="tabular-nums font-medium">
-          {formatCLP(row.total_cash_sales + row.total_card_sales)}
+          {formatCLP(row.total_cash_sales + row.total_card_sales + (row.total_transfer_sales ?? 0))}
         </span>
       ),
       className: 'text-right',
@@ -230,9 +230,14 @@ export default function CashPage() {
         title="Cajas"
         description={`${activeRegisterCount} activas / ${registers.length} registradas`}
         actions={
-          <Button size="sm" onClick={() => setNewRegisterOpen(true)}>
-            <Plus className="w-4 h-4" /> Nueva caja
-          </Button>
+          <>
+            <Button variant="secondary" size="sm" onClick={loadData} disabled={loading}>
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Actualizar
+            </Button>
+            <Button size="sm" onClick={() => setNewRegisterOpen(true)}>
+              <Plus className="w-4 h-4" /> Nueva caja
+            </Button>
+          </>
         }
       />
 

@@ -41,6 +41,7 @@ class CashSessionOut(BaseModel):
     closing_amount: float | None
     total_cash_sales: float
     total_card_sales: float
+    total_transfer_sales: float
     total_sales_count: int
     expected_cash: float | None
     difference: float | None

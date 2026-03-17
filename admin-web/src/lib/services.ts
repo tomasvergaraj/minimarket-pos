@@ -91,8 +91,17 @@ export async function fetchCategories(): Promise<string[]> {
     await delay(200)
     return [...new Set(mockProducts.map((p) => p.category).filter(Boolean))] as string[]
   }
-  const res = await api.get('/products/categories/list')
-  return res.data.data ?? res.data
+  // Use the categories table; fall back to extracting from products if the endpoint fails
+  try {
+    const res = await api.get('/categories/')
+    const cats: { name: string }[] = Array.isArray(res.data) ? res.data : (res.data.data ?? [])
+    return cats.map((c) => c.name)
+  } catch {
+    // Fallback: extract distinct categories from the product list
+    const res = await api.get('/products/', { params: { active_only: false, limit: 500 } })
+    const products: { category: string | null }[] = Array.isArray(res.data) ? res.data : (res.data.data ?? [])
+    return [...new Set(products.map((p) => p.category).filter(Boolean))] as string[]
+  }
 }
 
 export async function createProduct(data: ProductCreate): Promise<Product> {

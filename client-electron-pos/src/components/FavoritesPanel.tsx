@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Star, X, Pencil, Check } from "lucide-react";
-import { useFavoritesStore, FAVORITES_GRID_SIZE } from "@/stores/favoritesStore";
+import { ChevronDown, ChevronUp, Pencil, Check, Star, X } from "lucide-react";
+import { useFavoritesStore } from "@/stores/favoritesStore";
 import api from "@/services/api";
 import type { Product } from "@/types";
 import { formatCLP } from "@/utils/format";
@@ -10,14 +10,19 @@ interface Props {
 }
 
 export default function FavoritesPanel({ onProductClick }: Props) {
-  const { slots, setSlot, clearSlot } = useFavoritesStore();
+  const { slots, setSlot, clearSlot, gridSize, setGridSize } = useFavoritesStore();
   const [editMode, setEditMode] = useState(false);
   const [assigningSlot, setAssigningSlot] = useState<number | null>(null);
   const [assignSearch, setAssignSearch] = useState("");
   const [assignResults, setAssignResults] = useState<Product[]>([]);
+  const [showSizeEditor, setShowSizeEditor] = useState(false);
+  const [sizeInput, setSizeInput] = useState(String(gridSize));
   const assignInputRef = useRef<HTMLInputElement>(null);
 
-  // When entering assign mode for a slot, focus the input
+  useEffect(() => {
+    setSizeInput(String(gridSize));
+  }, [gridSize]);
+
   useEffect(() => {
     if (assigningSlot !== null) {
       setTimeout(() => assignInputRef.current?.focus(), 50);
@@ -61,12 +66,10 @@ export default function FavoritesPanel({ onProductClick }: Props) {
       return;
     }
     if (!fav) return;
-    // Fetch live product data (for stock validation)
     try {
       const { data } = await api.get(`/products/${fav.product_id}`);
       onProductClick(data);
     } catch {
-      // Fallback: mock product — server will validate stock on sale
       onProductClick({
         id: fav.product_id,
         sku: "",
@@ -93,6 +96,14 @@ export default function FavoritesPanel({ onProductClick }: Props) {
     }
   };
 
+  const handleSizeApply = () => {
+    const n = parseInt(sizeInput, 10);
+    if (!isNaN(n) && n >= 4) {
+      setGridSize(n);
+    }
+    setShowSizeEditor(false);
+  };
+
   const hasAny = slots.some(Boolean);
 
   return (
@@ -101,22 +112,59 @@ export default function FavoritesPanel({ onProductClick }: Props) {
         <div className="flex items-center gap-1.5 text-sm font-medium text-gray-500">
           <Star size={14} className="text-yellow-500" />
           Favoritos
+          <span className="text-xs text-gray-400">({gridSize} slots)</span>
         </div>
-        <button
-          onClick={() => { setEditMode((v) => !v); setAssigningSlot(null); }}
-          className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition ${
-            editMode
-              ? "bg-green-100 text-green-700 hover:bg-green-200"
-              : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-          }`}
-        >
-          {editMode ? <><Check size={12} /> Listo</> : <><Pencil size={12} /> Editar</>}
-        </button>
+        <div className="flex items-center gap-1">
+          {/* Size control */}
+          {editMode && (
+            <button
+              onClick={() => setShowSizeEditor((v) => !v)}
+              className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 transition"
+              title="Cambiar número de slots"
+            >
+              {showSizeEditor ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+              Slots
+            </button>
+          )}
+          <button
+            onClick={() => { setEditMode((v) => !v); setAssigningSlot(null); setShowSizeEditor(false); }}
+            className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition ${
+              editMode
+                ? "bg-green-100 text-green-700 hover:bg-green-200"
+                : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+            }`}
+          >
+            {editMode ? <><Check size={12} /> Listo</> : <><Pencil size={12} /> Editar</>}
+          </button>
+        </div>
       </div>
 
+      {/* Size editor */}
+      {editMode && showSizeEditor && (
+        <div className="mb-2 flex items-center gap-2 bg-gray-50 border rounded-lg px-3 py-2">
+          <span className="text-xs text-gray-600">Número de favoritos:</span>
+          <input
+            type="number"
+            min="4"
+            max="100"
+            value={sizeInput}
+            onChange={(e) => setSizeInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSizeApply()}
+            className="w-16 text-xs border rounded px-1.5 py-0.5 focus:outline-none focus:border-blue-500"
+          />
+          <button
+            onClick={handleSizeApply}
+            className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-0.5 rounded transition"
+          >
+            Aplicar
+          </button>
+          <span className="text-xs text-gray-400">Mín. 4, máx. 100</span>
+        </div>
+      )}
+
       <div className="grid grid-cols-4 gap-2">
-        {Array.from({ length: FAVORITES_GRID_SIZE }, (_, i) => {
-          const fav = slots[i];
+        {Array.from({ length: gridSize }, (_, i) => {
+          const fav = slots[i] ?? null;
           const isAssigning = assigningSlot === i;
 
           if (isAssigning) {

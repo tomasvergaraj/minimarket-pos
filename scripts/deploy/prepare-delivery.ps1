@@ -165,6 +165,8 @@ Copy-PathChecked -Source $adminDistDir -Destination (Join-Path $serverOutput "ad
 Copy-PathChecked -Source (Join-Path $repoRoot "scripts\windows\install-server.ps1") -Destination (Join-Path $serverOutput "scripts\windows\install-server.ps1")
 Copy-PathChecked -Source (Join-Path $repoRoot "scripts\windows\install-server.cmd") -Destination (Join-Path $serverOutput "scripts\windows\install-server.cmd")
 Copy-PathChecked -Source (Join-Path $repoRoot "scripts\windows\install-server-prebuilt.cmd") -Destination (Join-Path $serverOutput "scripts\windows\install-server-prebuilt.cmd")
+Copy-PathChecked -Source (Join-Path $repoRoot "scripts\windows\update-server.ps1") -Destination (Join-Path $serverOutput "scripts\windows\update-server.ps1")
+Copy-PathChecked -Source (Join-Path $repoRoot "scripts\windows\update-server.cmd") -Destination (Join-Path $serverOutput "scripts\windows\update-server.cmd")
 
 if ($IncludeSyncWorker.IsPresent) {
     Copy-PathChecked -Source (Join-Path $syncWorkerDir "sync.py") -Destination (Join-Path $serverOutput "sync-worker\sync.py")
@@ -218,6 +220,7 @@ Contenido:
 - `admin-web/dist`
 - `scripts/windows/install-server.cmd`
 - `scripts/windows/install-server-prebuilt.cmd`
+- `scripts/windows/update-server.cmd`
 
 Instalacion recomendada:
 
@@ -232,6 +235,19 @@ Notas:
 - Si PostgreSQL ya estaba instalado, agrega `-PostgresSuperPassword "TU_CLAVE"`.
 - Despues de instalar, ajusta `server-fastapi/.env` para licencias, SII y modulos opcionales.
 - `server-fastapi/.env` NO viene prellenado a proposito.
+
+Actualizacion de una instalacion existente:
+
+1. Copia esta carpeta nueva a una ruta temporal del PC servidor.
+2. Abre PowerShell o CMD como administrador.
+3. Ejecuta:
+
+   scripts\windows\update-server.cmd -InstallRoot "C:\Ruta\InstalacionActual"
+
+Notas de actualizacion:
+- `update-server.cmd` respalda `server-fastapi/.env` y el codigo actual en `server-fastapi\backups\update-AAAAMMDD-HHMMSS`.
+- Usa la `.env` existente del servidor y no la reescribe.
+- Si la actualizacion es offline y no cambian dependencias Python, puedes agregar `-SkipPipInstall`.
 "@
 
 Write-Utf8File -PathValue (Join-Path $serverOutput "OPCIONAL-SII.txt") -Content @"

@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from app.api.deps import require_admin
 from app.core.config import ROOT_DIR, settings
-from app.api.routes import products, sales, cash, kardex, reports, users, dashboard, orders, license
+from app.api.routes import products, sales, cash, kardex, reports, users, dashboard, orders, license, categories
 from app.schemas.config import ConfigUpdate, ConfigResponse
 from app.tax.sii.boleta import router as sii_router
 
@@ -22,6 +22,7 @@ ADMIN_INDEX_HEADERS = {
 ADMIN_COMPAT_PATHS = (
     "login",
     "products",
+    "categories",
     "sales",
     "inventory",
     "cash",
@@ -73,6 +74,7 @@ app.include_router(users.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
 app.include_router(license.router, prefix="/api")
+app.include_router(categories.router, prefix="/api")
 app.include_router(sii_router, prefix="/api")
 
 
@@ -164,6 +166,7 @@ window.location.replace({admin_url!r});
 
 @app.get("/login", include_in_schema=False)
 @app.get("/products", include_in_schema=False)
+@app.get("/categories", include_in_schema=False)
 @app.get("/sales", include_in_schema=False)
 @app.get("/inventory", include_in_schema=False)
 @app.get("/cash", include_in_schema=False)

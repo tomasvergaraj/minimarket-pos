@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard,
   Package,
+  Tag,
   Receipt,
   Warehouse,
   Landmark,
@@ -17,6 +18,7 @@ import nexoIconUrl from '../../assets/nexo-icon.svg'
 const iconMap = {
   LayoutDashboard,
   Package,
+  Tag,
   Receipt,
   Warehouse,
   Landmark,
@@ -28,6 +30,7 @@ const iconMap = {
 const navItems = [
   { path: '/', label: 'Dashboard', icon: 'LayoutDashboard' as const },
   { path: '/products', label: 'Productos', icon: 'Package' as const },
+  { path: '/categories', label: 'Categorías', icon: 'Tag' as const },
   { path: '/sales', label: 'Ventas', icon: 'Receipt' as const },
   { path: '/inventory', label: 'Inventario', icon: 'Warehouse' as const },
   { path: '/cash', label: 'Cajas', icon: 'Landmark' as const },

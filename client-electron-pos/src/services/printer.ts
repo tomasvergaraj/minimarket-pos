@@ -10,6 +10,7 @@ const PAYMENT_LABELS: Record<string, string> = {
   cash: "Efectivo",
   card: "Tarjeta",
   mixed: "Mixto",
+  transfer: "Transferencia",
 };
 
 export interface ReceiptBuildOptions {

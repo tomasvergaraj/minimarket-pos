@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import Button from '../../components/ui/Button'
 import type { Product } from '../../types'
 import { fetchProducts } from '../../lib/services'
+import api from '../../lib/api'
 
 interface ProductFormModalProps {
   open: boolean
@@ -20,14 +21,37 @@ const unitOptions = [
   { value: 'lt', label: 'Litro' },
 ]
 
-const categoryOptions = [
-  { value: 'Bebidas', label: 'Bebidas' },
-  { value: 'Lácteos', label: 'Lácteos' },
-  { value: 'Panadería', label: 'Panadería' },
-  { value: 'Snacks', label: 'Snacks' },
-  { value: 'Limpieza', label: 'Limpieza' },
-  { value: 'Otros', label: 'Otros' },
-]
+/** Normalize a text segment: remove accents, keep only alphanum, uppercase */
+function normalize(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9\s]/g, '')
+    .trim()
+    .toUpperCase()
+}
+
+/**
+ * Build a SKU from category + product name + a stable 4-digit suffix.
+ * Format: CAT-NAMEPART-NNNN
+ * - CAT: first 3 chars of the first word of the category (or "GEN" if empty)
+ * - NAMEPART: first 3 chars of each word in the name, max 2 words (6 chars total)
+ * - NNNN: caller-supplied suffix (kept stable across name/category edits)
+ * Example: "Bebidas y Jugos" + "Coca Cola" + "0042" → "BEB-COCCOL-0042"
+ */
+function buildSku(name: string, category: string, suffix: string): string {
+  const catWords = normalize(category).split(/\s+/).filter(Boolean)
+  const catPart = catWords.length > 0 ? catWords[0].slice(0, 3) : 'GEN'
+
+  const nameWords = normalize(name).split(/\s+/).filter(Boolean)
+  const namePart = nameWords.slice(0, 2).map((w) => w.slice(0, 3)).join('')
+
+  return namePart ? `${catPart}-${namePart}-${suffix}` : `${catPart}-${suffix}`
+}
+
+function newSuffix(): string {
+  return String(Math.floor(1000 + Math.random() * 9000))
+}
 
 export default function ProductFormModal({
   open,
@@ -56,12 +80,34 @@ export default function ProductFormModal({
     discount_price: '',
     discount_ends_at: '',
   })
+  const [skuManuallyEdited, setSkuManuallyEdited] = useState(false)
+  // Stable 4-digit suffix for this form session — avoids regenerating on every keystroke
+  const skuSuffixRef = useRef(newSuffix())
   const [baseSearch, setBaseSearch] = useState('')
   const [baseResults, setBaseResults] = useState<Product[]>([])
+  const [categories, setCategories] = useState<string[]>([])
+
+  // Load categories from backend
+  useEffect(() => {
+    api.get('/categories/')
+      .then((res) => {
+        const raw: { name: string }[] = Array.isArray(res.data) ? res.data : (res.data.data ?? [])
+        setCategories(raw.map((c) => c.name))
+      })
+      .catch(() => {
+        // fallback: load from products if categories endpoint is not ready
+        fetchProducts().then((result) => {
+          const cats = [...new Set(result.data.map((p) => p.category).filter(Boolean))] as string[]
+          setCategories(cats)
+        }).catch(() => {})
+      })
+  }, [open])
 
   useEffect(() => {
     setBaseSearch('')
     setBaseResults([])
+    setSkuManuallyEdited(false)
+    if (!product) skuSuffixRef.current = newSuffix()  // fresh suffix for each new product
     if (product) {
       setForm({
         sku: product.sku,
@@ -107,11 +153,34 @@ export default function ProductFormModal({
     }
   }, [product, open])
 
+  // Auto-generate SKU when name or category changes (new product only, not manually edited)
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newName = e.target.value
+    setForm((f) => ({
+      ...f,
+      name: newName,
+      sku: !isEdit && !skuManuallyEdited ? buildSku(newName, f.category, skuSuffixRef.current) : f.sku,
+    }))
+  }
+
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newCat = e.target.value
+    setForm((f) => ({
+      ...f,
+      category: newCat,
+      sku: !isEdit && !skuManuallyEdited && f.name ? buildSku(f.name, newCat, skuSuffixRef.current) : f.sku,
+    }))
+  }
+
+  const handleSkuChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSkuManuallyEdited(true)
+    setForm((f) => ({ ...f, sku: e.target.value }))
+  }
+
   const searchBaseProducts = useCallback(async (q: string) => {
     if (q.length < 2) { setBaseResults([]); return }
     try {
       const result = await fetchProducts({ search: q })
-      // Exclude current product and other packs
       setBaseResults(result.data.filter((p) => p.id !== product?.id && !p.is_pack).slice(0, 8))
     } catch {}
   }, [product?.id])
@@ -126,6 +195,7 @@ export default function ProductFormModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    const taxRate = Number(form.tax_rate)
     const data = {
       sku: form.sku,
       barcode: form.barcode || null,
@@ -135,7 +205,7 @@ export default function ProductFormModal({
       unit: form.unit,
       cost_price: Number(form.cost_price) || 0,
       sell_price: Number(form.sell_price),
-      tax_rate: Number(form.tax_rate),
+      tax_rate: taxRate,
       ...(isEdit ? {} : { stock: form.is_pack ? 0 : Number(form.stock) || 0 }),
       min_stock: Number(form.min_stock) || 0,
       is_pack: form.is_pack,
@@ -147,6 +217,15 @@ export default function ProductFormModal({
     onSave(data)
   }
 
+  const categoryOptions = [
+    ...categories.map((c) => ({ value: c, label: c })),
+  ]
+
+  const taxRateNum = Number(form.tax_rate)
+  const taxRateWarning = form.tax_rate !== '' && taxRateNum >= 0 && taxRateNum < 1
+    ? '⚠ Parece un decimal (ej: 0.19). Para IVA estándar chileno ingresa 19'
+    : null
+
   return (
     <Modal
       open={open}
@@ -156,11 +235,29 @@ export default function ProductFormModal({
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
-          <Input label="SKU" value={form.sku} onChange={set('sku')} required />
+          <div>
+            <Input
+              label="SKU"
+              value={form.sku}
+              onChange={handleSkuChange}
+              required
+              placeholder="Auto-generado desde el nombre"
+            />
+            {!isEdit && !skuManuallyEdited && form.name && (
+              <p className="text-xs text-text-muted mt-0.5">
+                Auto-generado — puedes editarlo libremente
+              </p>
+            )}
+          </div>
           <Input label="Código de barras" value={form.barcode} onChange={set('barcode')} />
         </div>
 
-        <Input label="Nombre" value={form.name} onChange={set('name')} required />
+        <Input
+          label="Nombre"
+          value={form.name}
+          onChange={handleNameChange}
+          required
+        />
         <Input label="Descripción" value={form.description} onChange={set('description')} />
 
         <div className="grid grid-cols-2 gap-4">
@@ -169,7 +266,7 @@ export default function ProductFormModal({
             options={categoryOptions}
             placeholder="Seleccionar"
             value={form.category}
-            onChange={set('category')}
+            onChange={handleCategoryChange}
           />
           <Select
             label="Unidad"
@@ -193,12 +290,21 @@ export default function ProductFormModal({
             onChange={set('sell_price')}
             required
           />
-          <Input
-            label="IVA %"
-            type="number"
-            value={form.tax_rate}
-            onChange={set('tax_rate')}
-          />
+          <div>
+            <Input
+              label="IVA % (19 = estándar)"
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              value={form.tax_rate}
+              onChange={set('tax_rate')}
+              placeholder="19"
+            />
+            {taxRateWarning && (
+              <p className="text-xs text-amber-600 mt-0.5">{taxRateWarning}</p>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -316,7 +422,7 @@ export default function ProductFormModal({
             <p className="text-xs text-amber-600 mt-1">
               {form.discount_ends_at
                 ? `La oferta expira el ${new Date(form.discount_ends_at).toLocaleString('es-CL')}`
-                : 'Sin fecha de expiración — la oferta estará activa indefinidamente'}
+                : 'Sin fecha de expiración — la oferta aplicará SIEMPRE. Configura una fecha si es temporal.'}
             </p>
           )}
         </div>

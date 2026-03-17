@@ -8,7 +8,7 @@ import { TableSkeleton } from '../../components/ui/Skeleton'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import ProductFormModal from './ProductFormModal'
 import type { Product } from '../../types'
-import { fetchProducts, createProduct, updateProduct, deleteProduct } from '../../lib/services'
+import { fetchProducts, createProduct, updateProduct, deleteProduct, fetchCategories } from '../../lib/services'
 import { formatCLP } from '../../lib/format'
 import toast from 'react-hot-toast'
 
@@ -33,14 +33,17 @@ export default function ProductsPage() {
       setError(null)
       const result = await fetchProducts({ search: search || undefined, category: categoryFilter || undefined })
       setProducts(result.data)
-      const cats = [...new Set(result.data.map((p) => p.category).filter(Boolean))] as string[]
-      setCategories(cats)
     } catch {
       setError('Error al cargar productos')
     } finally {
       setLoading(false)
     }
   }, [search, categoryFilter])
+
+  // Load categories independently so the dropdown doesn't collapse when a filter is active
+  useEffect(() => {
+    fetchCategories().then(setCategories).catch(() => {})
+  }, [])
 
   useEffect(() => {
     loadProducts()

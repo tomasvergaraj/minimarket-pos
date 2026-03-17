@@ -91,10 +91,11 @@ def create_sale(db: Session, data: SaleCreate) -> tuple[Sale, bytes | None]:
     change = 0.0
 
     payment = PaymentMethod(data.payment_method)
+    transfer_amount = getattr(data, "transfer_amount", 0) or 0
     if payment == PaymentMethod.CASH:
         change = data.cash_amount - total
     elif payment == PaymentMethod.MIXED:
-        change = (data.cash_amount + data.card_amount) - total
+        change = (data.cash_amount + data.card_amount + transfer_amount) - total
 
     sale = Sale(
         sale_number=max_num + 1,
@@ -107,6 +108,7 @@ def create_sale(db: Session, data: SaleCreate) -> tuple[Sale, bytes | None]:
         payment_method=payment,
         cash_amount=data.cash_amount,
         card_amount=data.card_amount,
+        transfer_amount=transfer_amount,
         change_amount=max(change, 0),
         status=SaleStatus.COMPLETED,
     )
@@ -118,6 +120,8 @@ def create_sale(db: Session, data: SaleCreate) -> tuple[Sale, bytes | None]:
         session.total_cash_sales = float(session.total_cash_sales or 0) + data.cash_amount - max(change, 0)
     if payment in (PaymentMethod.CARD, PaymentMethod.MIXED):
         session.total_card_sales = float(session.total_card_sales or 0) + data.card_amount
+    if payment in (PaymentMethod.TRANSFER, PaymentMethod.MIXED) and transfer_amount > 0:
+        session.total_transfer_sales = float(session.total_transfer_sales or 0) + transfer_amount
     session.total_sales_count = (session.total_sales_count or 0) + 1
 
     db.commit()

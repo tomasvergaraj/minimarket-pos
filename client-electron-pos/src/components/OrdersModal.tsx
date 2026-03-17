@@ -6,6 +6,7 @@ import {
   Clock,
   FileText,
   Printer,
+  Receipt,
   RotateCcw,
   Search,
   X,
@@ -24,7 +25,7 @@ interface Props {
   onLoadOrder: (order: Order, cartItems: CartItem[]) => void;
 }
 
-type Tab = "comandas" | "buscar";
+type Tab = "comandas" | "pagadas" | "buscar";
 
 const STATUS_LABEL: Record<string, string> = {
   open: "Abierta",
@@ -40,7 +41,6 @@ function StatusBadge({ status }: { status: string }) {
       </span>
     );
   }
-
   if (status === "closed") {
     return (
       <span className="flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
@@ -48,7 +48,6 @@ function StatusBadge({ status }: { status: string }) {
       </span>
     );
   }
-
   return (
     <span className="flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
       <XCircle size={10} /> Cancelada
@@ -64,7 +63,6 @@ async function orderToCartItems(order: Order): Promise<CartItem[]> {
         const unitPrice = product.is_on_offer && product.discount_price
           ? product.discount_price
           : product.sell_price;
-
         return {
           cartKey: product.id,
           product,
@@ -96,7 +94,6 @@ async function orderToCartItems(order: Order): Promise<CartItem[]> {
           created_at: "",
           updated_at: "",
         };
-
         return {
           cartKey: orderItem.product_id,
           product: fallback,
@@ -112,16 +109,24 @@ async function orderToCartItems(order: Order): Promise<CartItem[]> {
 export default function OrdersModal({ onClose, onLoadOrder }: Props) {
   const [tab, setTab] = useState<Tab>("comandas");
 
+  // — Comandas tab —
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("open");
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
 
+  // — Pagadas tab —
+  const [paidOrders, setPaidOrders] = useState<Order[]>([]);
+  const [loadingPaid, setLoadingPaid] = useState(false);
+  const [loadingSaleId, setLoadingSaleId] = useState<string | null>(null);
+
+  // — Buscar tab —
   const [searchType, setSearchType] = useState<"boleta" | "comanda">("boleta");
   const [searchNum, setSearchNum] = useState("");
   const [searchResult, setSearchResult] = useState<Sale | Order | null>(null);
   const [searching, setSearching] = useState(false);
 
+  // — Previews —
   const [previewOrder, setPreviewOrder] = useState<Order | null>(null);
   const [previewSale, setPreviewSale] = useState<Sale | null>(null);
 
@@ -139,29 +144,41 @@ export default function OrdersModal({ onClose, onLoadOrder }: Props) {
     }
   }, [statusFilter]);
 
+  const fetchPaidOrders = useCallback(async () => {
+    setLoadingPaid(true);
+    try {
+      const { data } = await api.get<Order[]>("/orders/", { params: { status: "closed", limit: 50 } });
+      setPaidOrders(data);
+    } catch {
+      toast.error("Error cargando comandas pagadas");
+    } finally {
+      setLoadingPaid(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (tab === "comandas") void fetchOrders();
-  }, [fetchOrders, tab]);
+    if (tab === "pagadas") void fetchPaidOrders();
+  }, [fetchOrders, fetchPaidOrders, tab]);
 
   const handleSearch = async () => {
-    const orderNumber = parseInt(searchNum.trim(), 10);
-    if (Number.isNaN(orderNumber) || orderNumber <= 0) {
-      toast.error("Ingresa un numero valido");
+    const num = parseInt(searchNum.trim(), 10);
+    if (Number.isNaN(num) || num <= 0) {
+      toast.error("Ingresa un número válido");
       return;
     }
-
     setSearching(true);
     setSearchResult(null);
     try {
       if (searchType === "boleta") {
-        const { data } = await api.get<Sale>(`/sales/number/${orderNumber}`);
+        const { data } = await api.get<Sale>(`/sales/number/${num}`);
         setSearchResult(data);
       } else {
-        const { data } = await api.get<Order>(`/orders/number/${orderNumber}`);
+        const { data } = await api.get<Order>(`/orders/number/${num}`);
         setSearchResult(data);
       }
     } catch {
-      toast.error(`${searchType === "boleta" ? "Boleta" : "Comanda"} Nro ${orderNumber} no encontrada`);
+      toast.error(`${searchType === "boleta" ? "Boleta" : "Comanda"} Nro ${num} no encontrada`);
     } finally {
       setSearching(false);
     }
@@ -172,7 +189,6 @@ export default function OrdersModal({ onClose, onLoadOrder }: Props) {
       toast.error("Solo se pueden cargar comandas abiertas");
       return;
     }
-
     const cartItems = await orderToCartItems(order);
     onLoadOrder(order, cartItems);
     onClose();
@@ -190,11 +206,20 @@ export default function OrdersModal({ onClose, onLoadOrder }: Props) {
     }
   };
 
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
+  const handleVerBoleta = async (saleId: string) => {
+    setLoadingSaleId(saleId);
+    try {
+      const { data } = await api.get<Sale>(`/sales/${saleId}`);
+      setPreviewSale(data);
+    } catch {
+      toast.error("Error al cargar la boleta");
+    } finally {
+      setLoadingSaleId(null);
+    }
+  };
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
@@ -202,9 +227,10 @@ export default function OrdersModal({ onClose, onLoadOrder }: Props) {
   return (
     <div
       className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center"
-      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <h2 className="font-bold text-lg text-gray-800">Comandas y Boletas</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -212,43 +238,57 @@ export default function OrdersModal({ onClose, onLoadOrder }: Props) {
           </button>
         </div>
 
-        <div className="flex border-b px-6">
-          <button
-            onClick={() => setTab("comandas")}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition -mb-px ${
-              tab === "comandas" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            <ClipboardList size={15} /> Comandas
-          </button>
-          <button
-            onClick={() => setTab("buscar")}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition -mb-px ${
-              tab === "buscar" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            <Search size={15} /> Buscar por numero
-          </button>
+        {/* Tabs */}
+        <div className="flex border-b px-4">
+          {(
+            [
+              { key: "comandas", label: "Comandas", icon: ClipboardList, color: "blue" },
+              { key: "pagadas",  label: "Pagadas",  icon: CheckCircle,   color: "green" },
+              { key: "buscar",   label: "Buscar",   icon: Search,        color: "blue" },
+            ] as const
+          ).map(({ key, label, icon: Icon, color }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition -mb-px ${
+                tab === key
+                  ? color === "green"
+                    ? "border-green-600 text-green-600"
+                    : "border-blue-600 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <Icon size={15} /> {label}
+            </button>
+          ))}
         </div>
 
+        {/* Content */}
         <div className="flex-1 overflow-y-auto p-4">
+
+          {/* ── Comandas tab ── */}
           {tab === "comandas" && (
             <div>
-              <div className="flex gap-2 mb-3">
-                {["open", "closed", "cancelled", ""].map((status) => (
+              <div className="flex gap-2 mb-3 flex-wrap">
+                {[
+                  { value: "open",      label: "Abiertas" },
+                  { value: "closed",    label: "Cerradas" },
+                  { value: "cancelled", label: "Canceladas" },
+                  { value: "",          label: "Todas" },
+                ].map(({ value, label }) => (
                   <button
-                    key={status}
-                    onClick={() => setStatusFilter(status)}
+                    key={value}
+                    onClick={() => setStatusFilter(value)}
                     className={`text-xs px-3 py-1 rounded-full border transition ${
-                      statusFilter === status
+                      statusFilter === value
                         ? "bg-blue-600 text-white border-blue-600"
                         : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
                     }`}
                   >
-                    {status === "" ? "Todas" : STATUS_LABEL[status]}
+                    {label}
                   </button>
                 ))}
-                <button onClick={() => void fetchOrders()} className="ml-auto text-gray-400 hover:text-gray-600">
+                <button onClick={() => void fetchOrders()} className="ml-auto text-gray-400 hover:text-gray-600" title="Refrescar">
                   <RotateCcw size={15} />
                 </button>
               </div>
@@ -261,50 +301,44 @@ export default function OrdersModal({ onClose, onLoadOrder }: Props) {
                 <div className="space-y-2">
                   {orders.map((order) => (
                     <div key={order.id} className="border rounded-xl p-3 hover:bg-gray-50 transition">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-gray-800">Comanda #{order.order_number}</span>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-gray-800">#{order.order_number}</span>
                           {order.reference && (
-                            <span className="text-sm text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                            <span className="text-xs text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
                               {order.reference}
                             </span>
                           )}
                           <StatusBadge status={order.status} />
                         </div>
-                        <span className="text-xs text-gray-400">{formatDate(order.created_at)}</span>
+                        <span className="text-xs text-gray-400 shrink-0">{formatDate(order.created_at)}</span>
                       </div>
 
-                      <div className="text-xs text-gray-500 mb-2">
+                      <p className="text-xs text-gray-500 mb-2">
                         {order.items.length === 0
-                          ? "Sin items"
-                          : order.items.map((item) => `${item.quantity}x ${item.product_name}`).join(", ")}
-                      </div>
-
-                      {order.sale_id && (
-                        <div className="text-xs text-green-600 mb-2">Vinculada a venta</div>
-                      )}
+                          ? "Sin ítems"
+                          : order.items.map((i) => `${i.quantity}x ${i.product_name}`).join(", ")}
+                      </p>
 
                       {confirmCancelId === order.id ? (
                         <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
                           <AlertTriangle size={14} className="text-red-500 shrink-0" />
-                          <p className="text-xs text-red-700 font-semibold flex-1">
-                            Cancelar Comanda #{order.order_number}?
-                          </p>
+                          <p className="text-xs text-red-700 font-semibold flex-1">¿Cancelar Comanda #{order.order_number}?</p>
                           <button
                             onClick={() => void handleCancelOrder(order)}
                             className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg font-semibold transition"
                           >
-                            Si, cancelar
+                            Sí
                           </button>
                           <button
                             onClick={() => setConfirmCancelId(null)}
-                            className="text-xs bg-white hover:bg-gray-100 text-gray-600 border border-gray-300 px-3 py-1.5 rounded-lg font-medium transition"
+                            className="text-xs bg-white border border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-1.5 rounded-lg font-medium transition"
                           >
                             No
                           </button>
                         </div>
                       ) : (
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap">
                           {order.status === "open" && (
                             <>
                               <button
@@ -317,7 +351,7 @@ export default function OrdersModal({ onClose, onLoadOrder }: Props) {
                                 onClick={() => setPreviewOrder(order)}
                                 className="flex items-center gap-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg transition"
                               >
-                                <Printer size={12} /> Preview
+                                <Printer size={12} /> Imprimir
                               </button>
                               <button
                                 onClick={() => setConfirmCancelId(order.id)}
@@ -328,12 +362,23 @@ export default function OrdersModal({ onClose, onLoadOrder }: Props) {
                             </>
                           )}
                           {order.status !== "open" && (
-                            <button
-                              onClick={() => setPreviewOrder(order)}
-                              className="flex items-center gap-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg transition"
-                            >
-                              <Printer size={12} /> Preview comanda
-                            </button>
+                            <>
+                              <button
+                                onClick={() => setPreviewOrder(order)}
+                                className="flex items-center gap-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg transition"
+                              >
+                                <Printer size={12} /> Ver comanda
+                              </button>
+                              {order.sale_id && (
+                                <button
+                                  onClick={() => void handleVerBoleta(order.sale_id!)}
+                                  disabled={loadingSaleId === order.sale_id}
+                                  className="flex items-center gap-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg transition disabled:opacity-50"
+                                >
+                                  <Receipt size={12} /> {loadingSaleId === order.sale_id ? "Cargando..." : "Ver boleta"}
+                                </button>
+                              )}
+                            </>
                           )}
                         </div>
                       )}
@@ -344,13 +389,81 @@ export default function OrdersModal({ onClose, onLoadOrder }: Props) {
             </div>
           )}
 
+          {/* ── Pagadas tab ── */}
+          {tab === "pagadas" && (
+            <div>
+              <div className="flex justify-end mb-3">
+                <button onClick={() => void fetchPaidOrders()} className="text-gray-400 hover:text-gray-600" title="Refrescar">
+                  <RotateCcw size={15} />
+                </button>
+              </div>
+
+              {loadingPaid ? (
+                <p className="text-center text-gray-400 py-8">Cargando...</p>
+              ) : paidOrders.length === 0 ? (
+                <p className="text-center text-gray-400 py-8">No hay comandas pagadas</p>
+              ) : (
+                <div className="space-y-2">
+                  {paidOrders.map((order) => (
+                    <div key={order.id} className="border border-green-200 rounded-xl p-3 bg-green-50">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-gray-800">#{order.order_number}</span>
+                          {order.reference && (
+                            <span className="text-xs text-green-700 bg-green-200 px-2 py-0.5 rounded-full">
+                              {order.reference}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                            <CheckCircle size={10} /> Pagada
+                          </span>
+                        </div>
+                        <span className="text-xs text-gray-400 shrink-0">{formatDate(order.created_at)}</span>
+                      </div>
+
+                      <p className="text-xs text-gray-500 mb-2">
+                        {order.items.length === 0
+                          ? "Sin ítems"
+                          : order.items.map((i) => `${i.quantity}x ${i.product_name}`).join(", ")}
+                      </p>
+
+                      <div className="flex gap-2 flex-wrap">
+                        <button
+                          onClick={() => setPreviewOrder(order)}
+                          className="flex items-center gap-1 text-xs bg-white border border-green-300 hover:bg-green-100 text-green-700 px-3 py-1.5 rounded-lg transition"
+                        >
+                          <Printer size={12} /> Ver comanda
+                        </button>
+                        {order.sale_id ? (
+                          <button
+                            onClick={() => void handleVerBoleta(order.sale_id!)}
+                            disabled={loadingSaleId === order.sale_id}
+                            className="flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white px-3 py-1.5 rounded-lg transition"
+                          >
+                            <Receipt size={12} /> {loadingSaleId === order.sale_id ? "Cargando..." : "Ver boleta"}
+                          </button>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic self-center">Sin boleta vinculada</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Buscar tab ── */}
           {tab === "buscar" && (
             <div>
+              {/* Type selector */}
               <div className="flex gap-2 mb-4">
                 <button
                   onClick={() => { setSearchType("boleta"); setSearchResult(null); }}
                   className={`flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border transition ${
-                    searchType === "boleta" ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
+                    searchType === "boleta"
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
                   }`}
                 >
                   <FileText size={14} /> Boleta
@@ -358,19 +471,22 @@ export default function OrdersModal({ onClose, onLoadOrder }: Props) {
                 <button
                   onClick={() => { setSearchType("comanda"); setSearchResult(null); }}
                   className={`flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border transition ${
-                    searchType === "comanda" ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
+                    searchType === "comanda"
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
                   }`}
                 >
                   <ClipboardList size={14} /> Comanda
                 </button>
               </div>
 
+              {/* Search input */}
               <div className="flex gap-2 mb-4">
                 <input
                   type="number"
                   value={searchNum}
-                  onChange={(event) => setSearchNum(event.target.value)}
-                  onKeyDown={(event) => event.key === "Enter" && void handleSearch()}
+                  onChange={(e) => setSearchNum(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && void handleSearch()}
                   placeholder={`Nro de ${searchType === "boleta" ? "boleta" : "comanda"}...`}
                   className="flex-1 border-2 rounded-xl px-4 py-2.5 text-lg focus:outline-none focus:border-blue-500"
                   autoFocus
@@ -384,15 +500,16 @@ export default function OrdersModal({ onClose, onLoadOrder }: Props) {
                 </button>
               </div>
 
+              {/* Boleta result */}
               {searchResult && "sale_number" in searchResult && (
                 <div className="border rounded-xl p-4 bg-gray-50">
                   <div className="flex items-center justify-between mb-3">
-                    <span className="font-bold text-gray-800">
-                      Boleta #{searchResult.sale_number}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-gray-800">Boleta #{searchResult.sale_number}</span>
+                      <span className="text-xs text-gray-500 capitalize">{searchResult.payment_method}</span>
+                    </div>
                     <span className="text-xs text-gray-400">{formatDate(searchResult.created_at)}</span>
                   </div>
-
                   <div className="space-y-1 mb-3">
                     {searchResult.items.map((item) => (
                       <div key={item.id} className="flex justify-between text-sm">
@@ -401,62 +518,66 @@ export default function OrdersModal({ onClose, onLoadOrder }: Props) {
                       </div>
                     ))}
                   </div>
-
-                  <div className="border-t pt-2 flex justify-between font-bold text-gray-800">
+                  <div className="border-t pt-2 flex justify-between font-bold text-gray-800 mb-3">
                     <span>TOTAL</span>
                     <span>{formatCLP(searchResult.total)}</span>
                   </div>
-
                   <button
-                    onClick={() => setPreviewSale(searchResult)}
-                    className="mt-3 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium w-full justify-center transition"
+                    onClick={() => setPreviewSale(searchResult as Sale)}
+                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium w-full justify-center transition"
                   >
-                    <Printer size={15} /> Preview Boleta
+                    <Printer size={15} /> Ver boleta completa
                   </button>
                 </div>
               )}
 
+              {/* Order result */}
               {searchResult && "order_number" in searchResult && (
                 <div className="border rounded-xl p-4 bg-gray-50">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-gray-800">
-                        Comanda #{searchResult.order_number}
-                      </span>
-                      {searchResult.reference && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-gray-800">Comanda #{(searchResult as Order).order_number}</span>
+                      {(searchResult as Order).reference && (
                         <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                          {searchResult.reference}
+                          {(searchResult as Order).reference}
                         </span>
                       )}
-                      <StatusBadge status={searchResult.status} />
+                      <StatusBadge status={(searchResult as Order).status} />
                     </div>
-                    <span className="text-xs text-gray-400">{formatDate(searchResult.created_at)}</span>
+                    <span className="text-xs text-gray-400">{formatDate((searchResult as Order).created_at)}</span>
                   </div>
-
                   <div className="space-y-1 mb-3">
-                    {searchResult.items.map((item) => (
+                    {(searchResult as Order).items.map((item) => (
                       <div key={item.id} className="flex justify-between text-sm">
                         <span className="text-gray-700">{item.quantity}x {item.product_name}</span>
                         <span className="text-gray-600">{formatCLP(item.unit_price)}</span>
                       </div>
                     ))}
                   </div>
-
                   <div className="flex gap-2">
-                    {searchResult.status === "open" && (
+                    {(searchResult as Order).status === "open" && (
                       <button
-                        onClick={() => void handleLoadSelectedOrder(searchResult)}
+                        onClick={() => void handleLoadSelectedOrder(searchResult as Order)}
                         className="flex-1 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium justify-center transition"
                       >
                         <ClipboardList size={15} /> Cargar al carrito
                       </button>
                     )}
                     <button
-                      onClick={() => setPreviewOrder(searchResult)}
+                      onClick={() => setPreviewOrder(searchResult as Order)}
                       className="flex-1 flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium justify-center transition"
                     >
-                      <Printer size={15} /> Preview Comanda
+                      <Printer size={15} /> Ver comanda
                     </button>
+                    {(searchResult as Order).sale_id && (
+                      <button
+                        onClick={() => void handleVerBoleta((searchResult as Order).sale_id!)}
+                        disabled={loadingSaleId === (searchResult as Order).sale_id}
+                        className="flex-1 flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-4 py-2 rounded-lg text-sm font-medium justify-center transition"
+                      >
+                        <Receipt size={15} /> {loadingSaleId === (searchResult as Order).sale_id ? "..." : "Ver boleta"}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -466,17 +587,10 @@ export default function OrdersModal({ onClose, onLoadOrder }: Props) {
       </div>
 
       {previewSale && (
-        <ReceiptPreviewModal
-          sale={previewSale}
-          onClose={() => setPreviewSale(null)}
-        />
+        <ReceiptPreviewModal sale={previewSale} onClose={() => setPreviewSale(null)} />
       )}
-
       {previewOrder && (
-        <OrderPreviewModal
-          order={previewOrder}
-          onClose={() => setPreviewOrder(null)}
-        />
+        <OrderPreviewModal order={previewOrder} onClose={() => setPreviewOrder(null)} />
       )}
     </div>
   );

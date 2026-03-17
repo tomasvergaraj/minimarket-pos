@@ -5,6 +5,7 @@ import {
   ClipboardList,
   LogOut,
   Minus,
+  Percent,
   Plus,
   Printer,
   Save,
@@ -52,9 +53,84 @@ function StockBadge({ remaining, minStock }: { remaining: number; minStock: numb
   );
 }
 
+/** Inline discount editor for a cart item */
+function DiscountEditor({
+  item,
+  onApply,
+  onClose,
+}: {
+  item: CartItem;
+  onApply: (newPrice: number) => void;
+  onClose: () => void;
+}) {
+  const [mode, setMode] = useState<"pct" | "fixed">("pct");
+  const [value, setValue] = useState("");
+
+  const originalPrice = item.product.is_on_offer && item.product.discount_price
+    ? item.product.discount_price
+    : item.product.sell_price;
+
+  const previewPrice = (() => {
+    const n = parseFloat(value);
+    if (isNaN(n) || n < 0) return originalPrice;
+    if (mode === "pct") return Math.round(originalPrice * (1 - n / 100));
+    return Math.round(originalPrice - n);
+  })();
+
+  const isValid = previewPrice >= 0 && previewPrice <= originalPrice;
+
+  return (
+    <div className="mt-1 bg-blue-50 border border-blue-200 rounded-lg p-2">
+      <div className="flex items-center gap-1 mb-1.5">
+        <button
+          onClick={() => setMode("pct")}
+          className={`text-xs px-2 py-0.5 rounded transition ${mode === "pct" ? "bg-blue-600 text-white" : "bg-white text-blue-600 border border-blue-300"}`}
+        >
+          %
+        </button>
+        <button
+          onClick={() => setMode("fixed")}
+          className={`text-xs px-2 py-0.5 rounded transition ${mode === "fixed" ? "bg-blue-600 text-white" : "bg-white text-blue-600 border border-blue-300"}`}
+        >
+          $
+        </button>
+        <input
+          type="number"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={mode === "pct" ? "% descuento" : "$ a descontar"}
+          className="flex-1 text-xs border rounded px-2 py-0.5 focus:outline-none focus:border-blue-500"
+          autoFocus
+          min="0"
+        />
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-blue-700">
+          Precio: {formatCLP(originalPrice)} → <strong>{formatCLP(previewPrice)}</strong>
+        </span>
+        <div className="flex gap-1">
+          <button
+            onClick={onClose}
+            className="text-xs text-gray-500 hover:text-gray-700 px-2 py-0.5"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => { if (isValid && previewPrice >= 0) { onApply(previewPrice); onClose(); } }}
+            disabled={!isValid || value === ""}
+            className="text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white px-2 py-0.5 rounded transition"
+          >
+            Aplicar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function POSPage() {
   const { user, register } = useAuthStore();
-  const { items, addItem, removeItem, updateQuantity, clear, total } = useCartStore();
+  const { items, addItem, removeItem, updateQuantity, updatePrice, clear, total } = useCartStore();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
@@ -63,6 +139,7 @@ export default function POSPage() {
   const [showOrders, setShowOrders] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
   const [previewOrder, setPreviewOrder] = useState<Order | null>(null);
+  const [discountOpenKey, setDiscountOpenKey] = useState<string | null>(null);
 
   const searchRef = useRef<HTMLInputElement>(null);
   const searchTimeoutRef = useRef<number | null>(null);
@@ -176,12 +253,14 @@ export default function POSPage() {
     setShowOrderRef(false);
   }, []);
 
-  const handlePaymentComplete = (sale: Sale) => {
-    setLastSale(sale);
+  const handlePaymentComplete = (sale: Sale, showReceipt: boolean) => {
     clear();
     resetOrderDraft();
     setShowPayment(false);
     toast.success(`Venta #${sale.sale_number} completada`);
+    if (showReceipt) {
+      setLastSale(sale);
+    }
     searchRef.current?.focus();
   };
 
@@ -321,7 +400,18 @@ export default function POSPage() {
                   : product.sell_price;
 
                 return (
-                  <div key={product.id} className="border-b last:border-0">
+                  <button
+                    key={product.id}
+                    className="w-full border-b last:border-0 text-left hover:bg-blue-50 active:bg-blue-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={outOfStock}
+                    onClick={() => {
+                      if (outOfStock) return;
+                      tryAddItem(product);
+                      setSearchQuery("");
+                      setSearchResults([]);
+                      searchRef.current?.focus();
+                    }}
+                  >
                     <div className="flex items-center justify-between px-4 py-2.5">
                       <div className="text-left flex-1 min-w-0 pr-2">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -344,6 +434,7 @@ export default function POSPage() {
                             Stock: {product.stock}{reserved > 0 && ` (${reserved} reservados)`}
                           </span>
                         </p>
+                        <StockBadge remaining={remaining} minStock={product.min_stock} />
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {product.is_on_offer && product.discount_price ? (
@@ -354,21 +445,9 @@ export default function POSPage() {
                         ) : (
                           <span className="font-bold text-blue-600 text-base">{formatCLP(displayPrice)}</span>
                         )}
-                        <button
-                          onClick={() => {
-                            tryAddItem(product);
-                            setSearchQuery("");
-                            setSearchResults([]);
-                            searchRef.current?.focus();
-                          }}
-                          disabled={outOfStock}
-                          className="text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white px-2.5 py-1 rounded-lg transition"
-                        >
-                          + Agregar
-                        </button>
                       </div>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -435,6 +514,10 @@ export default function POSPage() {
                     .reduce((sum, other) => sum + other.quantity, 0);
                   const remaining = item.product.stock - reservedForOthers - item.quantity;
                   const atLimit = item.quantity + 1 > item.product.stock - reservedForOthers;
+                  const originalPrice = item.product.is_on_offer && item.product.discount_price
+                    ? item.product.discount_price
+                    : item.product.sell_price;
+                  const hasDiscount = item.unit_price < originalPrice;
 
                   return (
                     <div key={item.cartKey} className="p-3 hover:bg-gray-50">
@@ -472,19 +555,47 @@ export default function POSPage() {
                           >
                             <Plus size={14} />
                           </button>
+                          {/* Discount button */}
+                          <button
+                            onClick={() => setDiscountOpenKey(discountOpenKey === item.cartKey ? null : item.cartKey)}
+                            title="Aplicar descuento"
+                            className={`w-8 h-8 flex items-center justify-center rounded-lg transition ${
+                              hasDiscount
+                                ? "bg-orange-100 text-orange-600 hover:bg-orange-200"
+                                : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                            }`}
+                          >
+                            <Percent size={13} />
+                          </button>
                         </div>
                         <div className="text-right">
-                          {item.product.is_on_offer && item.product.discount_price && (
+                          {hasDiscount && (
+                            <p className="text-xs text-gray-400 line-through">
+                              {formatCLP(originalPrice)} c/u
+                            </p>
+                          )}
+                          {item.product.is_on_offer && item.product.discount_price && !hasDiscount && (
                             <p className="text-xs text-gray-400 line-through">
                               {formatCLP(item.product.sell_price)} c/u
                             </p>
                           )}
-                          <p className={`text-xs font-semibold ${item.product.is_on_offer ? "text-red-500" : "text-gray-500"}`}>
+                          <p className={`text-xs font-semibold ${hasDiscount ? "text-orange-500" : item.product.is_on_offer ? "text-red-500" : "text-gray-500"}`}>
                             {formatCLP(item.unit_price)} c/u
                           </p>
                           <p className="font-bold text-gray-800">{formatCLP(item.subtotal)}</p>
                         </div>
                       </div>
+
+                      {discountOpenKey === item.cartKey && (
+                        <DiscountEditor
+                          item={item}
+                          onApply={(newPrice) => {
+                            updatePrice(item.cartKey, newPrice);
+                            toast.success(`Descuento aplicado: ${formatCLP(newPrice)} c/u`);
+                          }}
+                          onClose={() => setDiscountOpenKey(null)}
+                        />
+                      )}
 
                       <div className="mt-1">
                         <StockBadge remaining={remaining} minStock={item.product.min_stock} />
@@ -580,7 +691,7 @@ export default function POSPage() {
         <PaymentModal
           total={total()}
           orderIds={activeOrder ? [activeOrder.id] : undefined}
-          onComplete={handlePaymentComplete}
+          onComplete={(sale, showReceipt) => handlePaymentComplete(sale, showReceipt)}
           onClose={() => setShowPayment(false)}
         />
       )}

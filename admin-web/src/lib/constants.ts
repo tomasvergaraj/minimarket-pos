@@ -13,6 +13,7 @@ export const PAYMENT_METHOD_LABELS: Record<string, string> = {
   cash: 'Efectivo',
   card: 'Tarjeta',
   mixed: 'Mixto',
+  transfer: 'Transferencia',
 }
 
 export const SALE_STATUS_LABELS: Record<string, string> = {

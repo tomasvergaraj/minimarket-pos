@@ -105,6 +105,27 @@ cd ..\server-fastapi
 venv\Scripts\python.exe install_service.py install
 ```
 
+## Actualizacion del servidor existente
+
+Para una instalacion ya operativa, no reutilices `install-server.ps1` como flujo de upgrade porque hoy reescribe `server-fastapi/.env`.
+
+Usa el script de actualizacion:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\update-server.ps1 `
+  -InstallRoot "C:\Ruta\InstalacionActual"
+```
+
+Ese script:
+
+- respalda `server-fastapi/.env` y el codigo actual en `server-fastapi\backups\update-AAAAMMDD-HHMMSS`
+- conserva la `.env` existente
+- instala dependencias Python segun `requirements.txt`
+- ejecuta la actualizacion de schema y migraciones
+- reinstala y levanta el servicio Windows `MiniMarketPOS-Server`
+
+Si la actualizacion es offline y no cambian dependencias, puedes agregar `-SkipPipInstall`.
+
 ## Operacion del servicio Windows
 
 El backend usa un servicio Windows nativo llamado `MiniMarketPOS-Server`.
@@ -136,6 +157,21 @@ npm run electron:build
 ```
 
 El instalador queda en `client-electron-pos/dist-electron/`.
+
+## Limpieza de artefactos locales
+
+Para limpiar artefactos de build del repo sin tocar la base de datos ni `server-fastapi/.env`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\clean-build-artifacts.ps1
+```
+
+Opciones utiles:
+
+- `-IncludeLogs` para borrar logs del backend
+- `-IncludeNodeModules` para borrar `node_modules`
+- `-IncludeVenv` para borrar `server-fastapi\venv`
+- `-WhatIf` para simular la limpieza
 
 Al iniciar la app:
 

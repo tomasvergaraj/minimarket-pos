@@ -34,6 +34,7 @@ class CashSession(Base):
 
     total_cash_sales: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     total_card_sales: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    total_transfer_sales: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     total_sales_count: Mapped[int] = mapped_column(default=0)
 
     expected_cash: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)

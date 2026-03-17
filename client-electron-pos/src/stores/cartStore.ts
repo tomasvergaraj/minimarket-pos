@@ -16,6 +16,8 @@ interface CartState {
   removeItem: (cartKey: string) => void;
   /** Returns true if updated, false if quantity would exceed stock. */
   updateQuantity: (cartKey: string, qty: number) => boolean;
+  /** Set a custom unit price for a cart item (manual discount). */
+  updatePrice: (cartKey: string, newUnitPrice: number) => void;
   clear: () => void;
   total: () => number;
   itemCount: () => number;
@@ -83,6 +85,16 @@ export const useCartStore = create<CartState>((set, get) => ({
       ),
     });
     return true;
+  },
+
+  updatePrice: (cartKey, newUnitPrice) => {
+    set({
+      items: get().items.map((i) =>
+        i.cartKey === cartKey
+          ? { ...i, unit_price: newUnitPrice, subtotal: i.quantity * newUnitPrice }
+          : i
+      ),
+    });
   },
 
   clear: () => set({ items: [] }),

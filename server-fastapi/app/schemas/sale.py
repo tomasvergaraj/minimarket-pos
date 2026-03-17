@@ -14,9 +14,10 @@ class SaleCreate(BaseModel):
     cash_session_id: str
     register_id: str
     seller_id: str | None = None
-    payment_method: str  # cash, card, mixed
+    payment_method: str  # cash, card, mixed, transfer
     cash_amount: float = 0
     card_amount: float = 0
+    transfer_amount: float = 0
     items: list[SaleItemCreate]
     # Optional: IDs of open orders (comandas) to link/close with this sale
     order_ids: list[str] | None = None
@@ -49,6 +50,7 @@ class SaleOut(BaseModel):
     payment_method: str
     cash_amount: float
     card_amount: float
+    transfer_amount: float = 0
     change_amount: float
     status: str
     # Campos SII (None cuando la integración no está activa)

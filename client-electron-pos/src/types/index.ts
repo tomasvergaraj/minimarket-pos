@@ -57,6 +57,7 @@ export interface Sale {
   payment_method: string;
   cash_amount: number;
   card_amount: number;
+  transfer_amount: number;
   change_amount: number;
   status: string;
   // SII Boleta Electrónica

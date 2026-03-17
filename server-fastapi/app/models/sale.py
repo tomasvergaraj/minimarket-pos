@@ -12,6 +12,7 @@ class PaymentMethod(str, enum.Enum):
     CASH = "cash"
     CARD = "card"
     MIXED = "mixed"
+    TRANSFER = "transfer"
 
 
 class SaleStatus(str, enum.Enum):
@@ -32,9 +33,10 @@ class Sale(Base):
     tax_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     total: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
 
-    payment_method: Mapped[PaymentMethod] = mapped_column(SAEnum(PaymentMethod), nullable=False)
+    payment_method: Mapped[PaymentMethod] = mapped_column(SAEnum(PaymentMethod, native_enum=False), nullable=False)
     cash_amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     card_amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    transfer_amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     change_amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
 
     status: Mapped[SaleStatus] = mapped_column(SAEnum(SaleStatus), default=SaleStatus.COMPLETED)

@@ -7,6 +7,7 @@ import AdminLayout from './components/layout/AdminLayout'
 import LoginPage from './features/auth/LoginPage'
 import DashboardPage from './features/dashboard/DashboardPage'
 import ProductsPage from './features/products/ProductsPage'
+import CategoriesPage from './features/categories/CategoriesPage'
 import SalesPage from './features/sales/SalesPage'
 import UsersPage from './features/users/UsersPage'
 import InventoryPage from './features/inventory/InventoryPage'
@@ -46,6 +47,7 @@ export default function App() {
               <Route element={<AdminLayout />}>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/products" element={<ProductsPage />} />
+                <Route path="/categories" element={<CategoriesPage />} />
                 <Route path="/sales" element={<SalesPage />} />
                 <Route path="/inventory" element={<InventoryPage />} />
                 <Route path="/cash" element={<CashPage />} />

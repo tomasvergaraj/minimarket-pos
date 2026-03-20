@@ -5,23 +5,14 @@ from app.api.deps import get_current_user, require_admin, require_operational_li
 from app.db.session import get_db
 from app.models.product import Product
 from app.schemas.product import ProductCreate, ProductUpdate, ProductOut
+from app.services.product_stock import get_effective_stock
 
 router = APIRouter(prefix="/products", tags=["products"])
 
 
-def _effective_stock(product: Product, db: Session) -> int:
-    """For pack products, stock = floor(base_product.stock / units_contained)."""
-    if product.is_pack and product.base_product_id:
-        base = db.query(Product).filter(Product.id == product.base_product_id).first()
-        if base:
-            return int(base.stock) // max(int(product.units_contained), 1)
-        return 0
-    return int(product.stock)
-
-
 def _to_out(product: Product, db: Session) -> ProductOut:
     out = ProductOut.model_validate(product)
-    effective = _effective_stock(product, db)
+    effective = get_effective_stock(product, db)
     if effective != out.stock:
         out = out.model_copy(update={"stock": effective})
     return out

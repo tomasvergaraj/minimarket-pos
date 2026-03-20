@@ -7,5 +7,8 @@ export function formatCLP(amount: number): string {
 }
 
 export function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleString("es-CL");
+  // Backend stores UTC datetimes without timezone suffix — append "Z" so JS
+  // parses them as UTC and converts to the computer's local timezone.
+  const normalized = /Z$|[+-]\d{2}:\d{2}$/.test(dateStr) ? dateStr : `${dateStr}Z`;
+  return new Date(normalized).toLocaleString("es-CL");
 }

@@ -14,12 +14,12 @@ export default function AdminLayout() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  if (!user) return <Navigate to="/login" replace />
-
   useEffect(() => {
-    if (!blockingLicense || location.pathname === '/config') return
+    if (!user || !blockingLicense || location.pathname === '/config') return
     navigate('/config', { replace: true })
-  }, [blockingLicense, location.pathname, navigate])
+  }, [blockingLicense, location.pathname, navigate, user])
+
+  if (!user) return <Navigate to="/login" replace />
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface">

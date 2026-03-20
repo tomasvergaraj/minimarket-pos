@@ -29,7 +29,7 @@ interface Props {
 export default function PaymentModal({ total, onComplete, onClose, orderIds }: Props) {
   const { session, register } = useAuthStore();
   const items = useCartStore((s) => s.items);
-  const [method, setMethod] = useState<"cash" | "card" | "mixed" | "transfer">("cash");
+  const [method, setMethod] = useState<"cash" | "card" | "mixed" | "transfer">("card");
   const [cashAmount, setCashAmount] = useState("");
   const [cardAmount, setCardAmount] = useState("");
   const [transferAmount, setTransferAmount] = useState("");
@@ -86,8 +86,8 @@ export default function PaymentModal({ total, onComplete, onClose, orderIds }: P
   const quickAmounts = [1000, 2000, 5000, 10000, 20000, 50000];
 
   const paymentMethods = [
-    { key: "cash" as const, label: "Efectivo", icon: Banknote },
     { key: "card" as const, label: "Tarjeta", icon: CreditCard },
+    { key: "cash" as const, label: "Efectivo", icon: Banknote },
     { key: "transfer" as const, label: "Transferencia", icon: Landmark },
     { key: "mixed" as const, label: "Mixto", icon: ArrowLeftRight },
   ];

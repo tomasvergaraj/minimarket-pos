@@ -644,7 +644,7 @@ export default function POSPage() {
                   className="w-full border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-blue-500"
                 />
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-gray-400">Al guardar se abrirá la vista previa de la comanda.</span>
+                  <span className="text-xs text-gray-400">Al generar se imprimirá la comanda.</span>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setShowOrderRef(false)}
@@ -655,9 +655,9 @@ export default function POSPage() {
                     <button
                       onClick={() => void handleSaveOrder()}
                       disabled={savingOrder || items.length === 0}
-                      className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+                      className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap"
                     >
-                      {savingOrder ? "..." : "Vista previa"}
+                      {savingOrder ? "..." : "Guardar Comanda"}
                     </button>
                   </div>
                 </div>
@@ -672,7 +672,7 @@ export default function POSPage() {
                 className="w-full flex items-center justify-center gap-2 border-2 border-blue-300 hover:border-blue-500 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed text-blue-700 py-2 rounded-xl text-sm font-medium transition"
               >
                 <Save size={15} />
-                {activeOrder ? `Actualizar Comanda #${activeOrder.order_number}` : "Guardar como Comanda"}
+                {activeOrder ? `Actualizar Comanda #${activeOrder.order_number}` : "Generar Comanda"}
               </button>
             )}
 

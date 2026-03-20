@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.sale import Sale, SaleItem, SaleStatus
 from app.models.product import Product
+from app.services.product_stock import get_effective_stock
 
 CHILE_TZ = ZoneInfo("America/Santiago")
 
@@ -151,6 +152,7 @@ def generate_inventory_report(db: Session) -> BytesIO:
         cell.fill = header_fill
 
     products = db.query(Product).order_by(Product.name).all()
+    product_cache = {product.id: product for product in products}
 
     for p in products:
         ws.append([
@@ -158,7 +160,7 @@ def generate_inventory_report(db: Session) -> BytesIO:
             p.barcode or "",
             p.name,
             p.category or "",
-            p.stock,
+            get_effective_stock(p, db, product_cache),
             p.min_stock,
             float(p.cost_price),
             float(p.sell_price),

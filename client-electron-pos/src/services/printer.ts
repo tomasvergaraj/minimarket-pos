@@ -90,12 +90,18 @@ function buildOrderItemHtml(item: Order["items"][number]) {
   const itemLineHeight = itemNameLength > 48 ? 1.05 : 1.12;
 
   return `
-    <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;">
-      <div style="min-width:38px;text-align:center;font-size:18px;font-weight:800;line-height:1;color:${RECEIPT_COLOR_PRIMARY};">
-        ${escapeHtml(`${item.quantity}x`)}
+    <div style="margin-bottom:10px;">
+      <div style="display:flex;align-items:flex-start;gap:8px;">
+        <div style="min-width:38px;text-align:center;font-size:18px;font-weight:800;line-height:1;color:${RECEIPT_COLOR_PRIMARY};">
+          ${escapeHtml(`${item.quantity}x`)}
+        </div>
+        <div style="flex:1;font-size:${itemFontSize}px;font-weight:800;line-height:${itemLineHeight};letter-spacing:-0.01em;color:${RECEIPT_COLOR_PRIMARY};word-break:break-word;overflow-wrap:anywhere;">
+          ${escapeHtml(item.product_name)}
+        </div>
       </div>
-      <div style="flex:1;font-size:${itemFontSize}px;font-weight:800;line-height:${itemLineHeight};letter-spacing:-0.01em;color:${RECEIPT_COLOR_PRIMARY};word-break:break-word;overflow-wrap:anywhere;">
-        ${escapeHtml(item.product_name)}
+      <div style="display:flex;justify-content:space-between;gap:8px;padding-left:46px;font-size:12px;font-weight:600;color:${RECEIPT_COLOR_MUTED};margin-top:2px;">
+        <span>${escapeHtml(`${item.quantity} x ${formatCLP(item.unit_price)}`)}</span>
+        <span style="font-weight:700;color:${RECEIPT_COLOR_PRIMARY};white-space:nowrap;">${escapeHtml(formatCLP(item.subtotal))}</span>
       </div>
     </div>
   `;
@@ -266,6 +272,11 @@ export function buildOrderHtml(order: Order, options: OrderBuildOptions = {}) {
 
       <div style="display:flex;flex-direction:column;gap:2px;">
         ${order.items.map(buildOrderItemHtml).join("")}
+      </div>
+
+      <div style="border-top:2px dashed ${RECEIPT_COLOR_SEPARATOR};margin:10px 0 8px;"></div>
+      <div style="text-align:right;font-size:16px;font-weight:900;color:${RECEIPT_COLOR_PRIMARY};">
+        TOTAL: ${escapeHtml(formatCLP(order.items.reduce((sum, item) => sum + item.subtotal, 0)))}
       </div>
 
       ${commentsBoxHtml}

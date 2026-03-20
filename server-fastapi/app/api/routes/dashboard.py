@@ -10,6 +10,7 @@ from app.models.cash_register import CashSession, SessionStatus
 from app.models.product import Product
 from app.models.sale import Sale, SaleItem, SaleStatus
 from app.schemas.dashboard import DashboardStatsResponse
+from app.services.product_stock import is_below_min_stock
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -56,14 +57,12 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         .scalar()
         or 0
     )
-    productos_bajo_stock = (
-        db.query(func.count(Product.id))
-        .filter(
-            Product.is_active == True,
-            Product.stock <= Product.min_stock,
-        )
-        .scalar()
-        or 0
+    active_products = db.query(Product).filter(Product.is_active == True).all()
+    product_cache = {product.id: product for product in active_products}
+    productos_bajo_stock = sum(
+        1
+        for product in active_products
+        if is_below_min_stock(product, db, product_cache)
     )
 
     top_rows = (

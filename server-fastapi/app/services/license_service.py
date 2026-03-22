@@ -109,15 +109,73 @@ def _read_machine_guid() -> str:
     return ""
 
 
-def get_current_hardware_hash() -> str:
+def _read_windows_hw_profile_guid() -> str:
+    if platform.system().lower() != "windows":
+        return ""
+
+    try:
+        import winreg
+
+        with winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SYSTEM\CurrentControlSet\Control\IDConfigDB\Hardware Profiles\0001",
+        ) as key:
+            value, _ = winreg.QueryValueEx(key, "HwProfileGuid")
+            if value:
+                return str(value)
+    except OSError:
+        pass
+
+    return ""
+
+
+def _hash_hardware_components(components: dict[str, Any]) -> str:
+    normalized = {
+        key: str(value).strip()
+        for key, value in components.items()
+        if str(value).strip()
+    }
+    if not normalized:
+        normalized = {"fallback": "unknown-hardware"}
+    return hashlib.sha256(_json_dumps(normalized)).hexdigest()
+
+
+def _build_primary_hardware_components() -> dict[str, str]:
     components = {
+        "hostname": socket.gethostname(),
+        "machine_id": _read_machine_guid(),
+    }
+    hw_profile_guid = _read_windows_hw_profile_guid()
+    if hw_profile_guid:
+        components["hw_profile_guid"] = hw_profile_guid
+
+    if any(str(value).strip() for value in components.values()):
+        return components
+
+    return {"mac_address": f"{uuid.getnode():012x}"}
+
+
+def _build_legacy_hardware_components() -> dict[str, str]:
+    return {
         "hostname": socket.gethostname(),
         "machine_id": _read_machine_guid(),
         "mac_address": f"{uuid.getnode():012x}",
         "platform": platform.platform(),
         "processor": platform.processor(),
     }
-    return hashlib.sha256(_json_dumps(components)).hexdigest()
+
+
+def get_current_hardware_hashes() -> list[str]:
+    hashes: list[str] = []
+    for components in (_build_primary_hardware_components(), _build_legacy_hardware_components()):
+        candidate = _hash_hardware_components(components)
+        if candidate not in hashes:
+            hashes.append(candidate)
+    return hashes
+
+
+def get_current_hardware_hash() -> str:
+    return get_current_hardware_hashes()[0]
 
 
 def _load_public_key() -> Ed25519PublicKey | None:
@@ -237,7 +295,7 @@ def _verify_payload_for_machine(
     signature: str,
     *,
     installation_id: str,
-    current_hardware_hash: str,
+    current_hardware_hashes: list[str],
 ) -> dict[str, Any]:
     public_key = _load_public_key()
     if public_key is None:
@@ -260,7 +318,7 @@ def _verify_payload_for_machine(
         raise LicenseError("LICENSE_PRODUCT_INVALID", "La licencia no corresponde a este producto")
     if str(payload.get("installation_id")) != installation_id:
         raise LicenseError("LICENSE_INSTALLATION_MISMATCH", "La licencia no corresponde a esta instalación")
-    if str(payload.get("hardware_hash")) != current_hardware_hash:
+    if str(payload.get("hardware_hash")) not in current_hardware_hashes:
         raise LicenseError("HARDWARE_MISMATCH", "La licencia no corresponde a este servidor")
 
     license_id = str(payload.get("license_id") or "").strip()
@@ -292,19 +350,20 @@ def _verify_payload_for_machine(
         "features": [str(feature).strip() for feature in features if str(feature).strip()],
         "product": PRODUCT_CODE,
         "installation_id": installation_id,
-        "hardware_hash": current_hardware_hash,
+        "hardware_hash": current_hardware_hashes[0],
     }
 
 
 def activate_license_document(db: Session, license_document: str) -> dict[str, Any]:
     state = _get_or_create_state(db)
-    current_hardware_hash = get_current_hardware_hash()
+    current_hardware_hashes = get_current_hardware_hashes()
+    current_hardware_hash = current_hardware_hashes[0]
     payload, signature = _read_signed_document(license_document.strip())
     verified_payload = _verify_payload_for_machine(
         payload,
         signature,
         installation_id=state.installation_id,
-        current_hardware_hash=current_hardware_hash,
+        current_hardware_hashes=current_hardware_hashes,
     )
 
     now = _utcnow()
@@ -330,10 +389,11 @@ def activate_license_document(db: Session, license_document: str) -> dict[str, A
     return get_license_status(db)
 
 
-def get_license_status(db: Session) -> dict[str, Any]:
+def _legacy_get_license_status(db: Session) -> dict[str, Any]:
     state = _get_or_create_state(db)
     now = _utcnow()
-    current_hardware_hash = get_current_hardware_hash()
+    current_hardware_hashes = get_current_hardware_hashes()
+    current_hardware_hash = current_hardware_hashes[0]
     register_count = db.query(CashRegister).filter(CashRegister.is_active == True).count()
     verification_ready = is_verification_ready()
 
@@ -368,7 +428,7 @@ def get_license_status(db: Session) -> dict[str, Any]:
                 payload,
                 state.license_signature,
                 installation_id=state.installation_id,
-                current_hardware_hash=current_hardware_hash,
+                current_hardware_hashes=current_hardware_hashes,
             )
             state.status = "licensed"
             state.validation_error = None
@@ -412,7 +472,7 @@ def get_license_status(db: Session) -> dict[str, Any]:
                 register_count=register_count,
             )
 
-    if current_hardware_hash != state.hardware_hash:
+    if state.hardware_hash in current_hardware_hashes and state.hardware_hash != current_hardware_hash:
         state.status = "hardware_mismatch"
         state.validation_error = (
             "La prueba o licencia estaba asociada a otro servidor. "
@@ -451,6 +511,155 @@ def get_license_status(db: Session) -> dict[str, Any]:
 
     state.status = "trial_expired"
     state.validation_error = "La prueba de 30 días terminó. Debes activar una licencia para seguir operando."
+    db.commit()
+    db.refresh(state)
+    return _build_status_snapshot(
+        state=state,
+        current_hardware_hash=current_hardware_hash,
+        status="trial_expired",
+        message=state.validation_error,
+        is_active=False,
+        verification_ready=verification_ready,
+        trial_days_remaining=0,
+        register_count=register_count,
+    )
+
+
+def get_license_status(db: Session) -> dict[str, Any]:
+    state = _get_or_create_state(db)
+    now = _utcnow()
+    current_hardware_hashes = get_current_hardware_hashes()
+    current_hardware_hash = current_hardware_hashes[0]
+    register_count = db.query(CashRegister).filter(CashRegister.is_active == True).count()
+    verification_ready = is_verification_ready()
+
+    if state.max_seen_at and now < state.max_seen_at - timedelta(minutes=settings.LICENSE_CLOCK_SKEW_MINUTES):
+        state.status = "clock_tampered"
+        state.validation_error = (
+            "Se detecto un retroceso importante en el reloj del servidor. "
+            "Ajusta la fecha/hora y vuelve a intentar."
+        )
+        state.last_seen_at = now
+        db.commit()
+        db.refresh(state)
+        return _build_status_snapshot(
+            state=state,
+            current_hardware_hash=current_hardware_hash,
+            status=state.status,
+            message=state.validation_error,
+            is_active=False,
+            verification_ready=verification_ready,
+            trial_days_remaining=None,
+            register_count=register_count,
+        )
+
+    state.last_seen_at = now
+    if state.max_seen_at is None or now > state.max_seen_at:
+        state.max_seen_at = now
+
+    if state.license_payload and state.license_signature:
+        try:
+            payload = json.loads(state.license_payload)
+            verified_payload = _verify_payload_for_machine(
+                payload,
+                state.license_signature,
+                installation_id=state.installation_id,
+                current_hardware_hashes=current_hardware_hashes,
+            )
+            state.status = "licensed"
+            state.validation_error = None
+            state.hardware_hash = current_hardware_hash
+            state.license_id = verified_payload["license_id"]
+            state.customer_name = verified_payload["customer_name"]
+            state.license_type = verified_payload["license_type"]
+            state.license_expires_at = _parse_datetime(verified_payload.get("expires_at"))
+            state.updates_until = _parse_datetime(verified_payload.get("updates_until"))
+            state.max_registers = verified_payload.get("max_registers")
+            state.features_json = _serialize_features(verified_payload.get("features"))
+            db.commit()
+            db.refresh(state)
+            return _build_status_snapshot(
+                state=state,
+                current_hardware_hash=current_hardware_hash,
+                status="licensed",
+                message=f"Licencia activa para {state.customer_name}",
+                is_active=True,
+                verification_ready=verification_ready,
+                trial_days_remaining=None,
+                register_count=register_count,
+            )
+        except (json.JSONDecodeError, LicenseError) as exc:
+            if isinstance(exc, LicenseError):
+                state.status = exc.code.lower()
+                state.validation_error = exc.message
+            else:
+                state.status = "license_document_invalid"
+                state.validation_error = "La licencia guardada no tiene un formato valido"
+            db.commit()
+            db.refresh(state)
+            return _build_status_snapshot(
+                state=state,
+                current_hardware_hash=current_hardware_hash,
+                status=state.status,
+                message=state.validation_error,
+                is_active=False,
+                verification_ready=verification_ready,
+                trial_days_remaining=None,
+                register_count=register_count,
+            )
+
+    if state.hardware_hash in current_hardware_hashes and state.hardware_hash != current_hardware_hash:
+        state.hardware_hash = current_hardware_hash
+        db.commit()
+        db.refresh(state)
+    elif current_hardware_hash != state.hardware_hash:
+        # The built-in trial already stores its expiry in the database, so rebinding it
+        # avoids false positives after abrupt shutdowns without granting extra days.
+        if not state.license_payload and not state.license_signature and now <= state.trial_expires_at:
+            state.hardware_hash = current_hardware_hash
+            state.status = "trial"
+            state.validation_error = None
+            db.commit()
+            db.refresh(state)
+        else:
+            state.status = "hardware_mismatch"
+            state.validation_error = (
+                "La prueba o licencia estaba asociada a otro servidor. "
+                "Genera un nuevo codigo de activacion para reemitir la licencia."
+            )
+            db.commit()
+            db.refresh(state)
+            return _build_status_snapshot(
+                state=state,
+                current_hardware_hash=current_hardware_hash,
+                status=state.status,
+                message=state.validation_error,
+                is_active=False,
+                verification_ready=verification_ready,
+                trial_days_remaining=None,
+                register_count=register_count,
+            )
+
+    if now <= state.trial_expires_at:
+        remaining_seconds = max((state.trial_expires_at - now).total_seconds(), 0)
+        trial_days_remaining = max(0, int((remaining_seconds + 86399) // 86400))
+        state.status = "trial"
+        state.validation_error = None
+        db.commit()
+        db.refresh(state)
+        return _build_status_snapshot(
+            state=state,
+            current_hardware_hash=current_hardware_hash,
+            status="trial",
+            message=f"Prueba activa: quedan {trial_days_remaining} dias",
+            is_active=True,
+            verification_ready=verification_ready,
+            trial_days_remaining=trial_days_remaining,
+            register_count=register_count,
+        )
+
+    state.status = "trial_expired"
+    state.validation_error = "La prueba de 30 dias termino. Debes activar una licencia para seguir operando."
     db.commit()
     db.refresh(state)
     return _build_status_snapshot(

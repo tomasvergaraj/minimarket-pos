@@ -22,7 +22,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Bootstrap Nexo backend")
     parser.add_argument("--database-url", required=True)
     parser.add_argument("--server-host", default="0.0.0.0")
-    parser.add_argument("--server-port", type=int, default=8000)
+    parser.add_argument("--server-port", type=int, default=8001)
     parser.add_argument("--secret-key", default="")
     parser.add_argument("--store-name", default="Nexo")
     parser.add_argument("--store-rut", default="")

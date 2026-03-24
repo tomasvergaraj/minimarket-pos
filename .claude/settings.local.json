@@ -6,7 +6,18 @@
       "Bash(npx tsc:*)",
       "Bash(npm run build:*)",
       "Bash(./venv/Scripts/alembic upgrade:*)",
-      "Bash(npm run electron:build:*)"
+      "Bash(npm run electron:build:*)",
+      "Bash(find /c/Users/19726539-6/Desktop/Sistemas/Projects/minimarket-pos-main/server-fastapi/app -name *.py -type f)",
+      "Bash(find /c/Users/19726539-6/Desktop/Sistemas/Projects/minimarket-pos-main/admin-web/src -name *.tsx -o -name *.ts)",
+      "Bash(find /c/Users/19726539-6/Desktop/Sistemas/Projects/minimarket-pos-main/client-electron-pos/src -name *.tsx -o -name *.ts)",
+      "Bash(python -m alembic current)",
+      "Bash(python -c \":*)",
+      "Bash(python -m alembic downgrade 0006)",
+      "Bash(python -m alembic upgrade head)",
+      "Bash(grep -r \"PAYMENT_METHOD_LABELS\\\\|payment_method\" c:/Users/19726539-6/Desktop/Sistemas/Projects/minimarket-pos-main/admin-web/src --include=*.tsx --include=*.ts)",
+      "Bash(net stop:*)",
+      "Bash(net start:*)",
+      "Bash(powershell -Command \"Restart-Service ''MiniMarketPOS-Server'' -ErrorAction SilentlyContinue; Start-Sleep -Seconds 3; \\(Get-Service ''MiniMarketPOS-Server''\\).Status\")"
     ]
   }
 }

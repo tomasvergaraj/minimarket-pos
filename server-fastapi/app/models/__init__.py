@@ -6,6 +6,8 @@ from app.models.user import User
 from app.models.sii_folio import SIIFolioCounter
 from app.models.order import Order, OrderItem
 from app.models.license_state import LicenseState
+from app.models.supplier import Supplier
+from app.models.purchase_order import PurchaseOrder, PurchaseOrderItem
 
 __all__ = [
     "Product", "Sale", "SaleItem",
@@ -14,4 +16,6 @@ __all__ = [
     "SIIFolioCounter",
     "Order", "OrderItem",
     "LicenseState",
+    "Supplier",
+    "PurchaseOrder", "PurchaseOrderItem",
 ]

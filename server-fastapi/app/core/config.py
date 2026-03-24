@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/minimarket_pos"
     SERVER_HOST: str = "0.0.0.0"
-    SERVER_PORT: int = 8000
+    SERVER_PORT: int = 8001
     SECRET_KEY: str = "change-me-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
     LICENSE_TRIAL_DAYS: int = 30

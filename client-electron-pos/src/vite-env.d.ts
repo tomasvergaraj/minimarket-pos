@@ -22,6 +22,29 @@ interface ElectronAPI {
   onUpdateError: (callback: (msg: string) => void) => void;
   setFullscreen?: (value: boolean) => Promise<void>;
   isFullscreen?: () => Promise<boolean>;
+  // Customer display
+  updateCustomerDisplay?: (data: CustomerDisplayState) => void;
+  openCustomerDisplay?: () => Promise<void>;
+  closeCustomerDisplay?: () => Promise<void>;
+  isCustomerDisplayOpen?: () => Promise<boolean>;
+  onCustomerDisplayState?: (callback: (data: CustomerDisplayState) => void) => void;
+}
+
+interface CustomerDisplayItem {
+  name: string;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+}
+
+interface CustomerDisplayState {
+  phase: "idle" | "selling" | "paid";
+  storeName: string;
+  items: CustomerDisplayItem[];
+  total: number;
+  cashReceived?: number;
+  change?: number;
+  paymentMethod?: string;
 }
 
 interface Window {

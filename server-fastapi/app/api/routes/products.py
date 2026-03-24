@@ -1,11 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_admin, require_operational_license
+from app.core.config import ROOT_DIR
 from app.db.session import get_db
 from app.models.product import Product
 from app.schemas.product import ProductCreate, ProductUpdate, ProductOut
 from app.services.product_stock import get_effective_stock
+
+_ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+_IMAGE_EXT = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif"}
+_IMAGES_DIR: Path = ROOT_DIR / "static" / "images"
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -100,6 +107,59 @@ def update_product(product_id: str, data: ProductUpdate, db: Session = Depends(g
         setattr(product, key, value)
     db.commit()
     db.refresh(product)
+    return _to_out(product, db)
+
+
+@router.post(
+    "/{product_id}/image",
+    response_model=ProductOut,
+    dependencies=[Depends(require_admin), Depends(require_operational_license)],
+)
+async def upload_product_image(
+    product_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(404, "Product not found")
+    if file.content_type not in _ALLOWED_IMAGE_TYPES:
+        raise HTTPException(400, "El archivo debe ser una imagen (JPEG, PNG, WebP o GIF)")
+
+    _IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+    ext = _IMAGE_EXT[file.content_type]
+    filename = f"product_{product_id}.{ext}"
+    dest = _IMAGES_DIR / filename
+
+    # Remove any previous image for this product (different extension)
+    for old in _IMAGES_DIR.glob(f"product_{product_id}.*"):
+        if old != dest:
+            old.unlink(missing_ok=True)
+
+    content = await file.read()
+    dest.write_bytes(content)
+
+    product.image_url = f"/static/images/{filename}"
+    db.commit()
+    db.refresh(product)
+    return _to_out(product, db)
+
+
+@router.delete(
+    "/{product_id}/image",
+    response_model=ProductOut,
+    dependencies=[Depends(require_admin), Depends(require_operational_license)],
+)
+def delete_product_image(product_id: str, db: Session = Depends(get_db)):
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(404, "Product not found")
+    if product.image_url:
+        file_path = ROOT_DIR / product.image_url.lstrip("/")
+        file_path.unlink(missing_ok=True)
+        product.image_url = None
+        db.commit()
+        db.refresh(product)
     return _to_out(product, db)
 
 

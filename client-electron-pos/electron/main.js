@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, globalShortcut, dialog, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, globalShortcut, dialog, shell, screen } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
 const { execFile } = require("node:child_process");
@@ -20,6 +20,7 @@ const THERMAL_MIN_PAGE_HEIGHT_PX = 220;
 const THERMAL_PAGE_WIDTH_INCHES = 3.15;
 
 let mainWindow;
+let customerDisplayWindow = null;
 
 // Persist update state so renderer can query it after mounting
 let updateState = "idle"; // "idle" | "downloading" | "ready"
@@ -364,6 +365,44 @@ function buildWhatsAppUrl({ text, phoneNumber }) {
   return `${baseUrl}?text=${encodeURIComponent(message)}`;
 }
 
+function createCustomerDisplayWindow() {
+  const displays = screen.getAllDisplays();
+  const primary = screen.getPrimaryDisplay();
+  const external = displays.find((d) => d.id !== primary.id);
+  const bounds = external ? external.bounds : { x: primary.bounds.x + 80, y: primary.bounds.y + 80 };
+
+  customerDisplayWindow = new BrowserWindow({
+    x: bounds.x,
+    y: bounds.y,
+    width: external ? bounds.width : 900,
+    height: external ? bounds.height : 600,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+    title: "Pantalla Cliente — Nexo",
+    autoHideMenuBar: true,
+  });
+
+  const isDev = !app.isPackaged;
+  if (isDev) {
+    customerDisplayWindow.loadURL("http://localhost:5173/#/customer-display");
+  } else {
+    customerDisplayWindow.loadFile(path.join(__dirname, "../dist/index.html"), {
+      hash: "customer-display",
+    });
+  }
+
+  if (external) {
+    customerDisplayWindow.setFullScreen(true);
+  }
+
+  customerDisplayWindow.on("closed", () => {
+    customerDisplayWindow = null;
+  });
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -397,6 +436,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   createWindow();
+  createCustomerDisplayWindow();
 
   // F11 → toggle fullscreen (globalShortcut evita que Chromium lo intercepte)
   globalShortcut.register("F11", () => {
@@ -506,6 +546,32 @@ ipcMain.handle("save-receipt-pdf", async (_event, data) => {
     log.error("save-receipt-pdf error:", err);
     return { success: false, canceled: false, error: msg };
   }
+});
+
+// Customer display IPC
+ipcMain.on("customer-display-update", (_event, data) => {
+  if (customerDisplayWindow && !customerDisplayWindow.isDestroyed()) {
+    customerDisplayWindow.webContents.send("customer-display-state", data);
+  }
+});
+
+ipcMain.handle("open-customer-display", () => {
+  if (!customerDisplayWindow || customerDisplayWindow.isDestroyed()) {
+    createCustomerDisplayWindow();
+  } else {
+    customerDisplayWindow.focus();
+  }
+});
+
+ipcMain.handle("close-customer-display", () => {
+  if (customerDisplayWindow && !customerDisplayWindow.isDestroyed()) {
+    customerDisplayWindow.destroy();
+    customerDisplayWindow = null;
+  }
+});
+
+ipcMain.handle("is-customer-display-open", () => {
+  return !!(customerDisplayWindow && !customerDisplayWindow.isDestroyed());
 });
 
 ipcMain.handle("open-whatsapp", async (_event, data) => {

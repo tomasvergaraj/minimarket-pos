@@ -131,7 +131,7 @@ export default function LoginPage() {
               value={serverUrl}
               onChange={(e) => setServerUrlLocal(e.target.value)}
               className="w-full border rounded-lg px-3 py-2 text-sm"
-              placeholder="http://192.168.1.100:8000"
+              placeholder="http://192.168.1.100:8001"
             />
             <button onClick={handleSaveServer} className="w-full bg-gray-800 text-white py-2 rounded-lg text-sm">
               Guardar

@@ -20,6 +20,8 @@ class ProductBase(BaseModel):
     # Oferta / descuento
     discount_price: float | None = None
     discount_ends_at: datetime | None = None
+    # Imagen
+    image_url: str | None = None
 
 
 class ProductCreate(ProductBase):
@@ -43,6 +45,7 @@ class ProductUpdate(BaseModel):
     base_product_id: str | None = None
     discount_price: float | None = None
     discount_ends_at: datetime | None = None
+    image_url: str | None = None
 
 
 class ProductOut(ProductBase):

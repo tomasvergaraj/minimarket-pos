@@ -17,4 +17,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("update-error", (_e, msg) => callback(msg)),
   setFullscreen: (value) => ipcRenderer.invoke("set-fullscreen", value),
   isFullscreen: () => ipcRenderer.invoke("is-fullscreen"),
+  // Customer display
+  updateCustomerDisplay: (data) => ipcRenderer.send("customer-display-update", data),
+  openCustomerDisplay: () => ipcRenderer.invoke("open-customer-display"),
+  closeCustomerDisplay: () => ipcRenderer.invoke("close-customer-display"),
+  isCustomerDisplayOpen: () => ipcRenderer.invoke("is-customer-display-open"),
+  onCustomerDisplayState: (callback) =>
+    ipcRenderer.on("customer-display-state", (_e, data) => callback(data)),
 });

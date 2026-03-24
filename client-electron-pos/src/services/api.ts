@@ -2,7 +2,7 @@ import axios from "axios";
 import { isLicenseErrorCode, normalizeLicenseCode } from "@/lib/license";
 import { useLicenseStore } from "@/stores/licenseStore";
 
-const SERVER_URL = localStorage.getItem("server_url") || "http://localhost:8000";
+const SERVER_URL = localStorage.getItem("server_url") || "http://localhost:8001";
 let authToken = "";
 
 const api = axios.create({
@@ -52,7 +52,7 @@ export function setServerUrl(url: string) {
 }
 
 export function getServerUrl(): string {
-  return localStorage.getItem("server_url") || "http://localhost:8000";
+  return localStorage.getItem("server_url") || "http://localhost:8001";
 }
 
 export function setAuthToken(token: string) {

@@ -3,14 +3,20 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.deps import require_admin
 from app.core.config import ROOT_DIR, settings
-from app.api.routes import products, sales, cash, kardex, reports, users, dashboard, orders, license, categories
+from app.api.routes import products, sales, cash, kardex, reports, users, dashboard, orders, license, categories, suppliers, purchases
 from app.schemas.config import ConfigUpdate, ConfigResponse
 from app.tax.sii.boleta import router as sii_router
 
 app = FastAPI(title="Nexo Server", version="1.0.0")
+
+# Serve uploaded product images and other static assets
+_STATIC_DIR = ROOT_DIR / "static"
+_STATIC_DIR.mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
 ADMIN_DIST_DIR = ROOT_DIR.parent / "admin-web" / "dist"
 ADMIN_INDEX_FILE = ADMIN_DIST_DIR / "index.html"
@@ -29,6 +35,8 @@ ADMIN_COMPAT_PATHS = (
     "users",
     "reports",
     "config",
+    "suppliers",
+    "purchases",
 )
 ADMIN_COMPAT_STORAGE_RESET_SCRIPT = """
 (() => {
@@ -75,6 +83,8 @@ app.include_router(dashboard.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
 app.include_router(license.router, prefix="/api")
 app.include_router(categories.router, prefix="/api")
+app.include_router(suppliers.router, prefix="/api")
+app.include_router(purchases.router, prefix="/api")
 app.include_router(sii_router, prefix="/api")
 
 

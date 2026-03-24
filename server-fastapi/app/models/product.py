@@ -38,5 +38,8 @@ class Product(Base):
     discount_price: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
     discount_ends_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    # Imagen del producto (ruta relativa servida en /static/images/)
+    image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -223,7 +223,7 @@ export default function SettingsPage() {
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
                     className="w-full rounded-lg border px-4 py-2"
-                    placeholder="http://192.168.1.100:8000"
+                    placeholder="http://192.168.1.100:8001"
                   />
                   <p className="mt-1 text-xs text-gray-500">IP del PC servidor en la red local</p>
                 </div>

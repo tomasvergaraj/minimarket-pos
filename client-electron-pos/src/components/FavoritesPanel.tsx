@@ -5,6 +5,8 @@ import api from "@/services/api";
 import type { Product } from "@/types";
 import { formatCLP } from "@/utils/format";
 
+const SERVER_URL = localStorage.getItem("server_url") || "http://localhost:8001";
+
 interface Props {
   onProductClick: (product: Product) => void;
 }
@@ -47,6 +49,7 @@ export default function FavoritesPanel({ onProductClick }: Props) {
       product_id: product.id,
       product_name: product.name,
       sell_price: product.sell_price,
+      image_url: product.image_url ?? null,
     });
     setAssigningSlot(null);
     setAssignSearch("");
@@ -90,6 +93,7 @@ export default function FavoritesPanel({ onProductClick }: Props) {
         discount_price: null,
         discount_ends_at: null,
         is_on_offer: false,
+        image_url: fav.image_url ?? null,
         created_at: "",
         updated_at: "",
       });
@@ -207,7 +211,7 @@ export default function FavoritesPanel({ onProductClick }: Props) {
             <button
               key={i}
               onClick={() => handleSlotClick(i)}
-              className={`relative min-h-[64px] rounded-xl border-2 text-left p-2 transition text-sm leading-tight
+              className={`relative min-h-[64px] rounded-xl border-2 text-left p-2 transition text-sm leading-tight overflow-hidden
                 ${fav
                   ? editMode
                     ? "border-red-300 bg-red-50 hover:bg-red-100"
@@ -219,11 +223,18 @@ export default function FavoritesPanel({ onProductClick }: Props) {
             >
               {fav ? (
                 <>
-                  {editMode && (
-                    <X size={12} className="absolute top-1 right-1 text-red-400" />
+                  {fav.image_url && (
+                    <img
+                      src={`${SERVER_URL}${fav.image_url}`}
+                      alt={fav.product_name}
+                      className="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none"
+                    />
                   )}
-                  <p className="font-semibold text-gray-800 text-xs leading-tight line-clamp-2">{fav.product_name}</p>
-                  <p className="text-blue-600 font-bold text-xs mt-0.5">{formatCLP(fav.sell_price)}</p>
+                  {editMode && (
+                    <X size={12} className="absolute top-1 right-1 text-red-400 z-10" />
+                  )}
+                  <p className="relative z-10 font-semibold text-gray-800 text-xs leading-tight line-clamp-2">{fav.product_name}</p>
+                  <p className="relative z-10 text-blue-600 font-bold text-xs mt-0.5">{formatCLP(fav.sell_price)}</p>
                 </>
               ) : (
                 <span className="text-center w-full block text-lg">{editMode ? "+" : ""}</span>

@@ -91,6 +91,7 @@ async function orderToCartItems(order: Order): Promise<CartItem[]> {
           discount_price: null,
           discount_ends_at: null,
           is_on_offer: false,
+          image_url: null,
           created_at: "",
           updated_at: "",
         };

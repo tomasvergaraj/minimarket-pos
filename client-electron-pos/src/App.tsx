@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { useAuthStore } from "@/stores/authStore";
 import LicenseBlockOverlay from "@/components/LicenseBlockOverlay";
@@ -8,11 +8,18 @@ import OpenSessionPage from "@/pages/OpenSessionPage";
 import POSPage from "@/pages/POSPage";
 import SettingsPage from "@/pages/SettingsPage";
 import UpdateBanner from "@/components/UpdateBanner";
+import CustomerDisplayPage from "@/pages/CustomerDisplayPage";
 
 export default function App() {
   const user = useAuthStore((s) => s.user);
   const register = useAuthStore((s) => s.register);
   const session = useAuthStore((s) => s.session);
+  const location = useLocation();
+
+  // Customer display window: bypass all auth logic
+  if (location.pathname === "/customer-display") {
+    return <CustomerDisplayPage />;
+  }
 
   return (
     <>

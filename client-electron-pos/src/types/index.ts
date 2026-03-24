@@ -20,6 +20,8 @@ export interface Product {
   discount_price: number | null;
   discount_ends_at: string | null;
   is_on_offer: boolean;
+  // Imagen
+  image_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -163,4 +165,5 @@ export interface FavoriteSlot {
   product_id: string;
   product_name: string;
   sell_price: number;
+  image_url?: string | null;
 }

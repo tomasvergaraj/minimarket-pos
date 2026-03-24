@@ -5,6 +5,7 @@ import {
   ClipboardList,
   LogOut,
   Minus,
+  Monitor,
   Percent,
   Plus,
   Printer,
@@ -26,6 +27,7 @@ import CloseSessionModal from "@/components/CloseSessionModal";
 import ReceiptPreviewModal from "@/components/ReceiptPreviewModal";
 import OrderPreviewModal from "@/components/OrderPreviewModal";
 import FavoritesPanel from "@/components/FavoritesPanel";
+import CategoryGrid from "@/components/CategoryGrid";
 import OrdersModal from "@/components/OrdersModal";
 import nexoIconUrl from "../assets/nexo-icon.svg";
 
@@ -151,6 +153,27 @@ export default function POSPage() {
   const [orderRef, setOrderRef] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
   const [savingOrder, setSavingOrder] = useState(false);
+  const [customerDisplayOpen, setCustomerDisplayOpen] = useState(false);
+
+  // Keep customer display in sync with cart
+  useEffect(() => {
+    window.electronAPI?.updateCustomerDisplay?.({
+      phase: items.length > 0 ? "selling" : "idle",
+      storeName: "Nexo",
+      items: items.map((i) => ({
+        name: i.product.name,
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+        subtotal: i.subtotal,
+      })),
+      total: total(),
+    });
+  }, [items]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync display open state on mount
+  useEffect(() => {
+    window.electronAPI?.isCustomerDisplayOpen?.().then(setCustomerDisplayOpen).catch(() => {});
+  }, []);
 
   const tryAddItem = useCallback((product: Product) => {
     if (product.stock <= 0) {
@@ -225,19 +248,75 @@ export default function POSPage() {
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (event.key === "F2") {
+      const searchFocused = document.activeElement === searchRef.current;
+      const inInput = document.activeElement instanceof HTMLInputElement
+        || document.activeElement instanceof HTMLTextAreaElement;
+
+      // F1 / F2 → focus search
+      if (event.key === "F1" || event.key === "F2") {
         event.preventDefault();
         searchRef.current?.focus();
+        return;
       }
+
+      // F3 → clear cart
+      if (event.key === "F3" && items.length > 0) {
+        event.preventDefault();
+        clear();
+        resetOrderDraft();
+        toast("Carrito limpiado", { icon: "🗑️" });
+        return;
+      }
+
+      // F4 → open payment
       if (event.key === "F4" && items.length > 0) {
         event.preventDefault();
         setShowPayment(true);
+        return;
+      }
+
+      // Escape → close search results / blur
+      if (event.key === "Escape" && searchFocused) {
+        event.preventDefault();
+        setSearchQuery("");
+        setSearchResults([]);
+        searchRef.current?.blur();
+        return;
+      }
+
+      // +/- and Delete only when search is NOT focused
+      if (inInput) return;
+
+      const lastItem = items[items.length - 1];
+      if (!lastItem) return;
+
+      // NumpadAdd / + key → increment last item
+      if (event.key === "+" || event.key === "NumpadAdd") {
+        event.preventDefault();
+        const ok = updateQuantity(lastItem.cartKey, lastItem.quantity + 1);
+        if (!ok) toast.error("Stock insuficiente");
+        return;
+      }
+
+      // NumpadSubtract / - key → decrement last item
+      if (event.key === "-" || event.key === "NumpadSubtract") {
+        event.preventDefault();
+        updateQuantity(lastItem.cartKey, lastItem.quantity - 1);
+        return;
+      }
+
+      // Delete → remove last item
+      if (event.key === "Delete") {
+        event.preventDefault();
+        removeItem(lastItem.cartKey);
+        toast(`${lastItem.product.name} eliminado`, { icon: "✕" });
       }
     };
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [items.length]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
 
   const handleSearchKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === "Enter") {
@@ -253,7 +332,26 @@ export default function POSPage() {
     setShowOrderRef(false);
   }, []);
 
+  const toggleCustomerDisplay = async () => {
+    if (customerDisplayOpen) {
+      await window.electronAPI?.closeCustomerDisplay?.();
+      setCustomerDisplayOpen(false);
+    } else {
+      await window.electronAPI?.openCustomerDisplay?.();
+      setCustomerDisplayOpen(true);
+    }
+  };
+
   const handlePaymentComplete = (sale: Sale, showReceipt: boolean) => {
+    window.electronAPI?.updateCustomerDisplay?.({
+      phase: "paid",
+      storeName: "Nexo",
+      items: [],
+      total: sale.total,
+      cashReceived: sale.cash_amount > 0 ? sale.cash_amount : undefined,
+      change: sale.change_amount > 0 ? sale.change_amount : undefined,
+      paymentMethod: sale.payment_method,
+    });
     clear();
     resetOrderDraft();
     setShowPayment(false);
@@ -345,6 +443,17 @@ export default function POSPage() {
           <span className="text-sm text-gray-500">{user?.full_name}</span>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => void toggleCustomerDisplay()}
+            title={customerDisplayOpen ? "Cerrar pantalla cliente" : "Abrir pantalla cliente"}
+            className={`flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg transition ${
+              customerDisplayOpen
+                ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+            }`}
+          >
+            <Monitor size={16} />
+          </button>
           <button
             onClick={() => setShowOrders(true)}
             className="flex items-center gap-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg transition"
@@ -453,7 +562,31 @@ export default function POSPage() {
             </div>
           )}
 
-          {showFavorites && <FavoritesPanel onProductClick={tryAddItem} />}
+          {showFavorites && (
+            <>
+              <CategoryGrid onProductClick={tryAddItem} cartItems={items} />
+              <FavoritesPanel onProductClick={tryAddItem} />
+            </>
+          )}
+
+          {/* Shortcut hint bar */}
+          <div className="mt-auto pt-4 flex flex-wrap gap-x-4 gap-y-1">
+            {[
+              ["F1", "Buscar"],
+              ["F3", "Limpiar"],
+              ["F4", "Cobrar"],
+              ["+/-", "Cantidad"],
+              ["Del", "Quitar ítem"],
+              ["Esc", "Cerrar"],
+            ].map(([key, label]) => (
+              <span key={key} className="flex items-center gap-1 text-[11px] text-gray-400">
+                <kbd className="bg-gray-100 text-gray-500 border border-gray-300 rounded px-1 py-0.5 font-mono text-[10px] leading-none">
+                  {key}
+                </kbd>
+                {label}
+              </span>
+            ))}
+          </div>
         </div>
 
         <div className="w-[420px] bg-white border-l flex flex-col">

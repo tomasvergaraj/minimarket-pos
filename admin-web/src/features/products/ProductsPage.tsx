@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Search, Power, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Plus, Search, Power, AlertTriangle, RefreshCw, ImageOff } from 'lucide-react'
 import PageHeader from '../../components/patterns/PageHeader'
 import DataTable, { type Column } from '../../components/patterns/DataTable'
 import Button from '../../components/ui/Button'
@@ -8,8 +8,9 @@ import { TableSkeleton } from '../../components/ui/Skeleton'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import ProductFormModal from './ProductFormModal'
 import type { Product } from '../../types'
-import { fetchProducts, createProduct, updateProduct, deleteProduct, fetchCategories } from '../../lib/services'
+import { fetchProducts, createProduct, updateProduct, deleteProduct, fetchCategories, uploadProductImage } from '../../lib/services'
 import { formatCLP } from '../../lib/format'
+import { getServerUrl } from '../../lib/api'
 import toast from 'react-hot-toast'
 
 const filterInputClass =
@@ -50,6 +51,21 @@ export default function ProductsPage() {
   }, [loadProducts])
 
   const columns: Column<Product>[] = [
+    {
+      key: 'image_url',
+      header: '',
+      render: (r) => r.image_url ? (
+        <img
+          src={`${getServerUrl()}${r.image_url}`}
+          alt={r.name}
+          className="w-9 h-9 rounded-lg object-cover border border-border"
+        />
+      ) : (
+        <div className="w-9 h-9 rounded-lg bg-gray-100 border border-border flex items-center justify-center">
+          <ImageOff className="w-4 h-4 text-gray-300" />
+        </div>
+      ),
+    },
     { key: 'sku', header: 'SKU', render: (r) => <span className="font-mono text-xs text-text-muted">{r.sku}</span>, sortable: true },
     { key: 'name', header: 'Nombre', render: (r) => <span className="font-medium text-text-primary">{r.name}</span>, sortable: true },
     { key: 'category', header: 'Categoría', render: (r) => r.category || '—' },
@@ -112,15 +128,19 @@ export default function ProductsPage() {
     },
   ]
 
-  const handleSave = async (data: Record<string, unknown>) => {
+  const handleSave = async (data: Record<string, unknown>, imageFile?: File | null) => {
     setFormLoading(true)
     try {
+      let saved: Product
       if (editingProduct) {
-        await updateProduct(editingProduct.id, data)
+        saved = await updateProduct(editingProduct.id, data)
         toast.success('Producto actualizado')
       } else {
-        await createProduct(data as never)
+        saved = await createProduct(data as never)
         toast.success('Producto creado')
+      }
+      if (imageFile) {
+        await uploadProductImage(saved.id, imageFile)
       }
       setFormOpen(false)
       setEditingProduct(null)

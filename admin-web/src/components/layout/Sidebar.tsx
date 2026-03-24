@@ -11,6 +11,8 @@ import {
   Settings,
   ChevronsLeft,
   ChevronsRight,
+  Truck,
+  ShoppingCart,
 } from 'lucide-react'
 import clsx from 'clsx'
 import nexoIconUrl from '../../assets/nexo-icon.svg'
@@ -25,6 +27,8 @@ const iconMap = {
   Users,
   FileSpreadsheet,
   Settings,
+  Truck,
+  ShoppingCart,
 } as const
 
 const navItems = [
@@ -36,6 +40,8 @@ const navItems = [
   { path: '/cash', label: 'Cajas', icon: 'Landmark' as const },
   { path: '/users', label: 'Usuarios', icon: 'Users' as const },
   { path: '/reports', label: 'Reportes', icon: 'FileSpreadsheet' as const },
+  { path: '/suppliers', label: 'Proveedores', icon: 'Truck' as const },
+  { path: '/purchases', label: 'Compras', icon: 'ShoppingCart' as const },
   { path: '/config', label: 'Configuración', icon: 'Settings' as const },
 ]
 

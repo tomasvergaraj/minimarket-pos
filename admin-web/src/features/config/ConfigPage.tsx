@@ -175,7 +175,7 @@ export default function ConfigPage() {
               type="url"
               value={serverUrl}
               onChange={(e) => setServerUrlState(e.target.value)}
-              placeholder="http://192.168.1.10:8000"
+              placeholder="http://192.168.1.10:8001"
               className="flex-1 h-8 px-2.5 text-[13px] rounded-md border border-border bg-white text-text-secondary focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
             />
             <Button size="sm" variant="secondary" type="button" onClick={handleSaveServerUrl}>

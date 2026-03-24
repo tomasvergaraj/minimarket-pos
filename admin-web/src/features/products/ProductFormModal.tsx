@@ -1,16 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { ImageOff, Trash2, Upload } from 'lucide-react'
 import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import Button from '../../components/ui/Button'
 import type { Product } from '../../types'
 import { fetchProducts } from '../../lib/services'
-import api from '../../lib/api'
+import api, { getServerUrl } from '../../lib/api'
 
 interface ProductFormModalProps {
   open: boolean
   onClose: () => void
-  onSave: (data: Record<string, unknown>) => void
+  onSave: (data: Record<string, unknown>, imageFile?: File | null) => void
   product?: Product | null
   loading?: boolean
 }
@@ -86,6 +87,9 @@ export default function ProductFormModal({
   const [baseSearch, setBaseSearch] = useState('')
   const [baseResults, setBaseResults] = useState<Product[]>([])
   const [categories, setCategories] = useState<string[]>([])
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
 
   // Load categories from backend
   useEffect(() => {
@@ -107,6 +111,8 @@ export default function ProductFormModal({
     setBaseSearch('')
     setBaseResults([])
     setSkuManuallyEdited(false)
+    setImageFile(null)
+    setImagePreview(null)
     if (!product) skuSuffixRef.current = newSuffix()  // fresh suffix for each new product
     if (product) {
       setForm({
@@ -193,6 +199,17 @@ export default function ProductFormModal({
   const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [field]: e.target.value }))
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null
+    setImageFile(file)
+    if (file) {
+      const url = URL.createObjectURL(file)
+      setImagePreview(url)
+    } else {
+      setImagePreview(null)
+    }
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const taxRate = Number(form.tax_rate)
@@ -214,7 +231,7 @@ export default function ProductFormModal({
       discount_price: form.discount_price ? Number(form.discount_price) : null,
       discount_ends_at: form.discount_ends_at || null,
     }
-    onSave(data)
+    onSave(data, imageFile)
   }
 
   const categoryOptions = [
@@ -425,6 +442,65 @@ export default function ProductFormModal({
                 : 'Sin fecha de expiración — la oferta aplicará SIEMPRE. Configura una fecha si es temporal.'}
             </p>
           )}
+        </div>
+
+        {/* Imagen del producto */}
+        <div className="border-t border-border pt-4">
+          <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-3">Imagen del producto</p>
+          <div className="flex items-start gap-4">
+            {/* Preview */}
+            <div className="w-20 h-20 rounded-xl border border-border bg-gray-50 flex items-center justify-center overflow-hidden shrink-0">
+              {imagePreview ? (
+                <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+              ) : product?.image_url ? (
+                <img
+                  src={`${getServerUrl()}${product.image_url}`}
+                  alt={product.name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                />
+              ) : (
+                <ImageOff className="w-7 h-7 text-gray-300" />
+              )}
+            </div>
+            <div className="flex-1 space-y-2">
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={handleImageChange}
+                className="hidden"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => imageInputRef.current?.click()}
+              >
+                <Upload className="w-3.5 h-3.5" />
+                {imageFile ? 'Cambiar imagen' : product?.image_url ? 'Reemplazar imagen' : 'Subir imagen'}
+              </Button>
+              {imageFile && (
+                <p className="text-xs text-text-muted truncate max-w-50">{imageFile.name}</p>
+              )}
+              {!imageFile && product?.image_url && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImageFile(null)
+                    setImagePreview(null)
+                    // Signal deletion via a sentinel File object name
+                    const emptyFile = new File([], '__delete__')
+                    setImageFile(emptyFile)
+                  }}
+                  className="flex items-center gap-1 text-xs text-danger hover:underline"
+                >
+                  <Trash2 className="w-3 h-3" /> Eliminar imagen
+                </button>
+              )}
+              <p className="text-xs text-text-muted">JPEG, PNG, WebP o GIF. Se muestra en la tabla de productos y en el POS.</p>
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 pt-2 border-t border-border">

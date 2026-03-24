@@ -26,6 +26,13 @@ import type {
   DashboardStats,
   StoreConfig,
   PaginationMeta,
+  Supplier,
+  SupplierCreate,
+  SupplierUpdate,
+  PurchaseOrder,
+  PurchaseOrderCreate,
+  PurchaseOrderUpdate,
+  ReceivePurchaseOrderInput,
 } from '../types'
 
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS !== 'false'
@@ -127,6 +134,7 @@ export async function createProduct(data: ProductCreate): Promise<Product> {
       discount_price: data.discount_price ?? null,
       discount_ends_at: data.discount_ends_at ?? null,
       is_on_offer: data.discount_price != null,
+      image_url: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
@@ -152,6 +160,20 @@ export async function deleteProduct(id: string): Promise<void> {
     return
   }
   await api.delete(`/products/${id}`)
+}
+
+export async function uploadProductImage(productId: string, file: File): Promise<Product> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const res = await api.post(`/products/${productId}/image`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return res.data.data ?? res.data
+}
+
+export async function deleteProductImage(productId: string): Promise<Product> {
+  const res = await api.delete(`/products/${productId}/image`)
+  return res.data.data ?? res.data
 }
 
 // ── Sales ──
@@ -468,6 +490,68 @@ export async function activateLicense(licenseDocument: string): Promise<LicenseS
   }
   const res = await api.post('/license/activate', { license_document: licenseDocument })
   return res.data.data ?? res.data
+}
+
+// ── Suppliers ──
+
+export async function fetchSuppliers(includeInactive = false): Promise<Supplier[]> {
+  const res = await api.get('/suppliers/', { params: { include_inactive: includeInactive || undefined } })
+  return Array.isArray(res.data) ? res.data : (res.data.data ?? [])
+}
+
+export async function createSupplier(data: SupplierCreate): Promise<Supplier> {
+  const res = await api.post('/suppliers/', data)
+  return res.data.data ?? res.data
+}
+
+export async function updateSupplier(id: string, data: SupplierUpdate): Promise<Supplier> {
+  const res = await api.put(`/suppliers/${id}`, data)
+  return res.data.data ?? res.data
+}
+
+export async function deleteSupplier(id: string): Promise<void> {
+  await api.delete(`/suppliers/${id}`)
+}
+
+// ── Purchases ──
+
+export async function fetchPurchases(params: {
+  supplier_id?: string
+  status?: string
+  skip?: number
+  limit?: number
+} = {}): Promise<PurchaseOrder[]> {
+  const res = await api.get('/purchases/', { params })
+  return Array.isArray(res.data) ? res.data : (res.data.data ?? [])
+}
+
+export async function fetchPurchase(id: string): Promise<PurchaseOrder> {
+  const res = await api.get(`/purchases/${id}`)
+  return res.data.data ?? res.data
+}
+
+export async function createPurchase(data: PurchaseOrderCreate): Promise<PurchaseOrder> {
+  const res = await api.post('/purchases/', data)
+  return res.data.data ?? res.data
+}
+
+export async function updatePurchase(id: string, data: PurchaseOrderUpdate): Promise<PurchaseOrder> {
+  const res = await api.put(`/purchases/${id}`, data)
+  return res.data.data ?? res.data
+}
+
+export async function confirmPurchase(id: string): Promise<PurchaseOrder> {
+  const res = await api.post(`/purchases/${id}/confirm`)
+  return res.data.data ?? res.data
+}
+
+export async function receivePurchase(id: string, data: ReceivePurchaseOrderInput): Promise<PurchaseOrder> {
+  const res = await api.post(`/purchases/${id}/receive`, data)
+  return res.data.data ?? res.data
+}
+
+export async function deletePurchase(id: string): Promise<void> {
+  await api.delete(`/purchases/${id}`)
 }
 
 // ── Reports ──

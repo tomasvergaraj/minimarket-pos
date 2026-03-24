@@ -108,6 +108,8 @@ export interface Product {
   discount_price: number | null
   discount_ends_at: string | null
   is_on_offer: boolean
+  // Imagen
+  image_url: string | null
   created_at: string
   updated_at: string
 }
@@ -129,6 +131,7 @@ export interface ProductCreate {
   base_product_id?: string | null
   discount_price?: number | null
   discount_ends_at?: string | null
+  image_url?: string | null
 }
 
 export interface ProductUpdate {
@@ -147,6 +150,7 @@ export interface ProductUpdate {
   base_product_id?: string | null
   discount_price?: number | null
   discount_ends_at?: string | null
+  image_url?: string | null
 }
 
 export interface SaleItem {
@@ -246,4 +250,100 @@ export interface StoreConfig {
   store_name: string
   store_rut: string
   store_address: string
+}
+
+// ── Suppliers ──
+
+export interface Supplier {
+  id: string
+  name: string
+  rut: string | null
+  contact_name: string | null
+  phone: string | null
+  email: string | null
+  address: string | null
+  notes: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface SupplierCreate {
+  name: string
+  rut?: string | null
+  contact_name?: string | null
+  phone?: string | null
+  email?: string | null
+  address?: string | null
+  notes?: string | null
+}
+
+export interface SupplierUpdate {
+  name?: string
+  rut?: string | null
+  contact_name?: string | null
+  phone?: string | null
+  email?: string | null
+  address?: string | null
+  notes?: string | null
+  is_active?: boolean
+}
+
+// ── Purchase Orders ──
+
+export type PurchaseOrderStatus = 'draft' | 'confirmed' | 'received'
+
+export interface PurchaseOrderItem {
+  id: string
+  purchase_order_id: string
+  product_id: string
+  product_name: string | null
+  product_sku: string | null
+  quantity_ordered: number
+  quantity_received: number
+  unit_cost: number
+  subtotal: number
+}
+
+export interface PurchaseOrder {
+  id: string
+  order_number: number
+  supplier_id: string
+  supplier_name: string | null
+  status: PurchaseOrderStatus
+  notes: string | null
+  subtotal: number
+  total: number
+  created_by: string | null
+  confirmed_at: string | null
+  received_at: string | null
+  created_at: string
+  updated_at: string
+  items: PurchaseOrderItem[]
+}
+
+export interface PurchaseOrderItemCreate {
+  product_id: string
+  quantity_ordered: number
+  unit_cost: number
+}
+
+export interface PurchaseOrderCreate {
+  supplier_id: string
+  notes?: string | null
+  items: PurchaseOrderItemCreate[]
+}
+
+export interface PurchaseOrderUpdate {
+  notes?: string | null
+  items?: PurchaseOrderItemCreate[]
+}
+
+export interface ReceiveItemInput {
+  item_id: string
+  quantity_received: number
+}
+
+export interface ReceivePurchaseOrderInput {
+  items: ReceiveItemInput[]
 }

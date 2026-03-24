@@ -17,11 +17,11 @@ function resolveAdminPath(path: string): string {
 }
 
 function resolveWindowOrigin(): string {
-  if (typeof window === 'undefined') return 'http://localhost:8000'
+  if (typeof window === 'undefined') return 'http://localhost:8001'
 
   const origin = window.location.origin
   if (window.location.port === DEV_SERVER_PORT) {
-    return 'http://localhost:8000'
+    return 'http://localhost:8001'
   }
 
   return origin

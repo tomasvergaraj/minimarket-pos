@@ -57,6 +57,7 @@ function withProductDefaults(
     | 'discount_price'
     | 'discount_ends_at'
     | 'is_on_offer'
+    | 'image_url'
   >
 ): Product {
   return {
@@ -66,6 +67,7 @@ function withProductDefaults(
     discount_price: null,
     discount_ends_at: null,
     is_on_offer: false,
+    image_url: null,
     ...product,
   }
 }

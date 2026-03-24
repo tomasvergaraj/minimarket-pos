@@ -14,6 +14,8 @@ import InventoryPage from './features/inventory/InventoryPage'
 import CashPage from './features/cash/CashPage'
 import ReportsPage from './features/reports/ReportsPage'
 import ConfigPage from './features/config/ConfigPage'
+import SuppliersPage from './features/suppliers/SuppliersPage'
+import PurchasesPage from './features/purchases/PurchasesPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -54,6 +56,8 @@ export default function App() {
                 <Route path="/users" element={<UsersPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
                 <Route path="/config" element={<ConfigPage />} />
+                <Route path="/suppliers" element={<SuppliersPage />} />
+                <Route path="/purchases" element={<PurchasesPage />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

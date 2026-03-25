@@ -6,6 +6,7 @@ import {
 import toast from 'react-hot-toast'
 import PageHeader from '../../components/patterns/PageHeader'
 import Button from '../../components/ui/Button'
+import { formatDateTime } from '../../lib/format'
 import { fetchSyncStatus, fetchSyncConfig, updateSyncConfig, triggerSync } from '../../lib/services'
 import type { SyncStatus, SyncConfigOut, SyncLog } from '../../types'
 
@@ -13,17 +14,21 @@ import type { SyncStatus, SyncConfigOut, SyncLog } from '../../types'
 // Helpers
 // ──────────────────────────────────────────────────────────────────────────────
 
+function parseSyncDate(iso: string): Date {
+  if (!iso.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(iso)) {
+    return new Date(`${iso}Z`)
+  }
+  return new Date(iso)
+}
+
 function fmtDate(iso: string | null): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString('es-CL', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
+  return formatDateTime(iso)
 }
 
 function fmtDuration(log: SyncLog): string {
   if (!log.completed_at) return '—'
-  const ms = new Date(log.completed_at).getTime() - new Date(log.started_at).getTime()
+  const ms = parseSyncDate(log.completed_at).getTime() - parseSyncDate(log.started_at).getTime()
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`
 }
 

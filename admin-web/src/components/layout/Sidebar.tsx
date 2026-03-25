@@ -18,6 +18,7 @@ import {
   TrendingDown,
   LayoutGrid,
   CloudUpload,
+  ClipboardList,
 } from 'lucide-react'
 import clsx from 'clsx'
 import nexoIconUrl from '../../assets/nexo-icon.svg'
@@ -39,6 +40,7 @@ const iconMap = {
   TrendingDown,
   LayoutGrid,
   CloudUpload,
+  ClipboardList,
 } as const
 
 const navItems = [
@@ -57,6 +59,7 @@ const navItems = [
   { path: '/tables', label: 'Mesas', icon: 'LayoutGrid' as const },
   { path: '/expenses', label: 'Gastos', icon: 'TrendingDown' as const },
   { path: '/sync', label: 'Sync Cloud', icon: 'CloudUpload' as const },
+  { path: '/audit', label: 'Auditoría', icon: 'ClipboardList' as const },
   { path: '/config', label: 'Configuración', icon: 'Settings' as const },
 ]
 

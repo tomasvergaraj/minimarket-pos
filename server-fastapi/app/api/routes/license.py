@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin
+from app.core.limiter import limiter
 from app.db.session import get_db
 from app.schemas.license import LicenseActivateRequest, LicenseStatusResponse
 from app.services.license_service import LicenseError, activate_license_document, get_license_status
@@ -19,7 +20,8 @@ def license_status(db: Session = Depends(get_db)):
 
 
 @router.post("/activate", response_model=LicenseStatusResponse, dependencies=[Depends(require_admin)])
-def activate_license(data: LicenseActivateRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def activate_license(request: Request, data: LicenseActivateRequest, db: Session = Depends(get_db)):
     try:
         status = activate_license_document(db, data.license_document)
     except LicenseError as exc:

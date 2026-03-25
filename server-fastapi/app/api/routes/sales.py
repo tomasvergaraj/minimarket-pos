@@ -10,6 +10,7 @@ from app.models.user import User
 from app.schemas.sale import SaleCreate, SaleOut, SaleListResponse
 from app.core.config import settings
 from app.services.sale_service import create_sale, void_sale
+from app.services.audit_service import SALE_VOID, log_action
 from app.services.email_service import send_receipt_email
 from app.tax.sii.service import background_upload
 
@@ -107,10 +108,24 @@ def post_send_receipt(
     background_tasks.add_task(send_receipt_email, sale, email)
 
 
-@router.post("/{sale_id}/void", response_model=SaleOut, dependencies=[Depends(require_admin)])
-def post_void_sale(sale_id: str, db: Session = Depends(get_db)):
+@router.post("/{sale_id}/void", response_model=SaleOut)
+def post_void_sale(
+    sale_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
     try:
         sale = void_sale(db, sale_id)
+        log_action(
+            db,
+            action=SALE_VOID,
+            entity_type="sale",
+            entity_id=sale_id,
+            detail={"sale_number": sale.sale_number, "total": float(sale.total)},
+            user_id=current_user.id,
+            username=current_user.username,
+        )
+        db.commit()
         return sale
     except ValueError as e:
         raise HTTPException(400, str(e))

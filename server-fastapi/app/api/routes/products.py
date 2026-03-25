@@ -7,7 +7,9 @@ from app.api.deps import get_current_user, require_admin, require_operational_li
 from app.core.config import ROOT_DIR
 from app.db.session import get_db
 from app.models.product import Product
+from app.models.user import User
 from app.schemas.product import ProductCreate, ProductUpdate, ProductOut
+from app.services.audit_service import PRICE_CHANGE, log_action
 from app.services.product_stock import get_effective_stock
 
 _ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
@@ -97,14 +99,31 @@ def create_product(data: ProductCreate, db: Session = Depends(get_db)):
 @router.put(
     "/{product_id}",
     response_model=ProductOut,
-    dependencies=[Depends(require_admin), Depends(require_operational_license)],
+    dependencies=[Depends(require_operational_license)],
 )
-def update_product(product_id: str, data: ProductUpdate, db: Session = Depends(get_db)):
+def update_product(
+    product_id: str,
+    data: ProductUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(404, "Product not found")
-    for key, value in data.model_dump(exclude_unset=True).items():
+    changes = data.model_dump(exclude_unset=True)
+    old_price = float(product.sell_price) if "sell_price" in changes else None
+    for key, value in changes.items():
         setattr(product, key, value)
+    if old_price is not None and old_price != float(data.sell_price):  # type: ignore[arg-type]
+        log_action(
+            db,
+            action=PRICE_CHANGE,
+            entity_type="product",
+            entity_id=product_id,
+            detail={"name": product.name, "old_price": old_price, "new_price": float(data.sell_price)},  # type: ignore[arg-type]
+            user_id=current_user.id,
+            username=current_user.username,
+        )
     db.commit()
     db.refresh(product)
     return _to_out(product, db)

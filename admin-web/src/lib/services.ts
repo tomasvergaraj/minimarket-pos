@@ -752,3 +752,15 @@ export async function triggerSync(): Promise<{ message: string; log_id: number }
   const res = await api.post('/sync/trigger')
   return res.data
 }
+
+export async function fetchAuditLogs(params?: {
+  action?: string
+  entity_type?: string
+  from_date?: string
+  to_date?: string
+  limit?: number
+  offset?: number
+}) {
+  const res = await api.get('/audit/', { params })
+  return res.data
+}

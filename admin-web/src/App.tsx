@@ -21,6 +21,7 @@ import CustomersPage from './features/customers/CustomersPage'
 import ExpensesPage from './features/expenses/ExpensesPage'
 import TablesPage from './features/tables/TablesPage'
 import SyncPage from './features/sync/SyncPage'
+import AuditPage from './features/audit/AuditPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -68,6 +69,7 @@ export default function App() {
                 <Route path="/expenses" element={<ExpensesPage />} />
                 <Route path="/tables" element={<TablesPage />} />
                 <Route path="/sync" element={<SyncPage />} />
+                <Route path="/audit" element={<AuditPage />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

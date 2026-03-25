@@ -537,3 +537,17 @@ export interface SyncConfigUpdate {
   supabase_key: string
   branch_id: string
 }
+
+// ── Audit Log ──
+
+export interface AuditLog {
+  id: string
+  timestamp: string
+  user_id: string | null
+  username: string | null
+  action: string
+  entity_type: string
+  entity_id: string | null
+  detail: string | null
+  ip_address: string | null
+}

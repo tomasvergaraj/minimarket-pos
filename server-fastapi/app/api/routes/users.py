@@ -1,13 +1,15 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin
+from app.core.limiter import limiter
 from app.core.security import create_access_token, hash_pin, is_hashed_pin, verify_pin
 from app.db.session import get_db
+from app.services.audit_service import USER_CREATE, USER_UPDATE, USER_DEACTIVATE, log_action
 from app.models.user import User
 from app.schemas.user import (
     AuthSessionResponse,
@@ -47,22 +49,37 @@ def list_users(db: Session = Depends(get_db)):
     return db.query(User).filter(User.is_active == True).all()
 
 
-@router.post("/", response_model=UserOut, status_code=201, dependencies=[Depends(require_admin)])
-def create_user(data: UserCreate, db: Session = Depends(get_db)):
+@router.post("/", response_model=UserOut, status_code=201)
+def create_user(
+    data: UserCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
     if _find_user_by_pin(db, data.pin):
         raise HTTPException(409, {"code": "PIN_TAKEN", "message": "Ya existe un usuario con ese PIN"})
 
     payload = data.model_dump()
     payload["pin"] = hash_pin(data.pin)
-    user = User(**payload)
-    db.add(user)
+    new_user = User(**payload)
+    db.add(new_user)
+    db.flush()
+    log_action(
+        db,
+        action=USER_CREATE,
+        entity_type="user",
+        entity_id=new_user.id,
+        detail={"username": new_user.username, "role": new_user.role},
+        user_id=current_user.id,
+        username=current_user.username,
+    )
     db.commit()
-    db.refresh(user)
-    return user
+    db.refresh(new_user)
+    return new_user
 
 
 @router.post("/login/pin", response_model=AuthSessionResponse)
-def login_pin(data: PinLogin, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login_pin(request: Request, data: PinLogin, db: Session = Depends(get_db)):
     user = _find_user_by_pin(db, data.pin, active_only=True)
     if not user or not verify_pin(data.pin, user.pin):
         raise HTTPException(401, {"code": "INVALID_PIN", "message": "PIN invalido"})
@@ -90,8 +107,13 @@ def login_pin(data: PinLogin, db: Session = Depends(get_db)):
     }
 
 
-@router.put("/{user_id}", response_model=UserResponse, dependencies=[Depends(require_admin)])
-def update_user(user_id: str, data: UserUpdate, db: Session = Depends(get_db)):
+@router.put("/{user_id}", response_model=UserResponse)
+def update_user(
+    user_id: str,
+    data: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(404, {"code": "USER_NOT_FOUND", "message": "User not found"})
@@ -114,6 +136,16 @@ def update_user(user_id: str, data: UserUpdate, db: Session = Depends(get_db)):
     for key, value in payload.items():
         setattr(user, key, value)
 
+    was_deactivated = "is_active" in data.model_dump(exclude_unset=True) and not data.is_active  # type: ignore[union-attr]
+    log_action(
+        db,
+        action=USER_DEACTIVATE if was_deactivated else USER_UPDATE,
+        entity_type="user",
+        entity_id=user_id,
+        detail={"changed_fields": list(data.model_dump(exclude_unset=True).keys()), "target_username": user.username},
+        user_id=current_user.id,
+        username=current_user.username,
+    )
     db.commit()
     db.refresh(user)
     return {"success": True, "data": user, "error": None}

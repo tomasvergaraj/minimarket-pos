@@ -7,10 +7,15 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
+from app.core.limiter import limiter
 
 from app.api.deps import require_admin
 from app.core.config import ROOT_DIR, settings
-from app.api.routes import products, sales, cash, kardex, reports, users, dashboard, orders, license, categories, suppliers, purchases, promotions, customers, notifications, expenses, tables, sync
+from app.api.routes import products, sales, cash, kardex, reports, users, dashboard, orders, license, categories, suppliers, purchases, promotions, customers, notifications, expenses, tables, sync, audit
 from app.schemas.config import ConfigUpdate, ConfigResponse
 from app.tax.sii.boleta import router as sii_router
 
@@ -49,6 +54,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Nexo Server", version="1.0.0", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # Serve uploaded product images and other static assets
 _STATIC_DIR = ROOT_DIR / "static"
@@ -130,6 +138,7 @@ app.include_router(notifications.router, prefix="/api")
 app.include_router(expenses.router, prefix="/api")
 app.include_router(tables.router, prefix="/api")
 app.include_router(sync.router, prefix="/api")
+app.include_router(audit.router, prefix="/api")
 app.include_router(sii_router, prefix="/api")
 
 

@@ -1,6 +1,6 @@
 from datetime import date, datetime, time, timedelta
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_admin, require_operational_license
@@ -8,7 +8,9 @@ from app.db.session import get_db
 from app.models.sale import Sale, SaleStatus
 from app.models.user import User
 from app.schemas.sale import SaleCreate, SaleOut, SaleListResponse
+from app.core.config import settings
 from app.services.sale_service import create_sale, void_sale
+from app.services.email_service import send_receipt_email
 from app.tax.sii.service import background_upload
 
 router = APIRouter(prefix="/sales", tags=["sales"])
@@ -88,6 +90,21 @@ def list_sales(
             "has_more": skip + len(sales) < total,
         },
     }
+
+
+@router.post("/{sale_id}/send-receipt", status_code=204, dependencies=[Depends(get_current_user)])
+def post_send_receipt(
+    sale_id: str,
+    email: str = Body(..., embed=True),
+    background_tasks: BackgroundTasks = None,
+    db: Session = Depends(get_db),
+):
+    if not settings.smtp_configured:
+        raise HTTPException(400, "SMTP no configurado en el servidor")
+    sale = db.query(Sale).filter(Sale.id == sale_id).first()
+    if not sale:
+        raise HTTPException(404, "Sale not found")
+    background_tasks.add_task(send_receipt_email, sale, email)
 
 
 @router.post("/{sale_id}/void", response_model=SaleOut, dependencies=[Depends(require_admin)])

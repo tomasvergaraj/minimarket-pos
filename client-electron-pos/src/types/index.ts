@@ -155,9 +155,26 @@ export interface Order {
   reference: string | null;
   notes: string | null;
   sale_id: string | null;
+  table_id: string | null;
+  bill_requested: boolean;
   created_at: string;
   updated_at: string;
   items: OrderItem[];
+}
+
+export interface TableStatus {
+  id: string;
+  name: string;
+  capacity: number;
+  pos_x: number;
+  pos_y: number;
+  is_active: boolean;
+  status: "free" | "occupied" | "bill_requested";
+  order_id: string | null;
+  order_number: number | null;
+  order_total: number | null;
+  opened_at: string | null;
+  item_count: number;
 }
 
 export interface FavoriteSlot {
@@ -166,4 +183,48 @@ export interface FavoriteSlot {
   product_name: string;
   sell_price: number;
   image_url?: string | null;
+}
+
+// ── Customers / Loyalty ──
+
+export interface Customer {
+  id: string;
+  name: string;
+  rut: string | null;
+  phone: string | null;
+  email: string | null;
+  points_balance: number;
+  total_purchases: number;
+  visit_count: number;
+  is_active: boolean;
+}
+
+export interface LoyaltyConfig {
+  points_per_thousand: number;
+  point_value: number;
+}
+
+// ── Promotions ──
+
+export type PromotionType =
+  | "percentage_discount"
+  | "fixed_discount"
+  | "buy_n_get_m"
+  | "min_quantity";
+
+export interface Promotion {
+  id: string;
+  name: string;
+  promo_type: PromotionType;
+  product_id: string | null;
+  category_name: string | null;
+  discount_pct: number | null;
+  discount_amount: number | null;
+  buy_qty: number | null;
+  get_qty: number | null;
+  min_qty: number | null;
+  special_price: number | null;
+  is_active: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
 }

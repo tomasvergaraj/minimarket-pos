@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import { useCartStore } from "@/stores/cartStore";
 import { formatCLP } from "@/utils/format";
@@ -24,9 +24,13 @@ interface Props {
   onClose: () => void;
   /** IDs of open orders (comandas) to link/close with this sale */
   orderIds?: string[];
+  /** Loyalty */
+  customerId?: string | null;
+  pointsToRedeem?: number;
+  loyaltyDiscount?: number;
 }
 
-export default function PaymentModal({ total, onComplete, onClose, orderIds }: Props) {
+export default function PaymentModal({ total, onComplete, onClose, orderIds, customerId, pointsToRedeem = 0, loyaltyDiscount = 0 }: Props) {
   const { session, register } = useAuthStore();
   const items = useCartStore((s) => s.items);
   const [method, setMethod] = useState<"cash" | "card" | "mixed" | "transfer">("card");
@@ -35,6 +39,24 @@ export default function PaymentModal({ total, onComplete, onClose, orderIds }: P
   const [transferAmount, setTransferAmount] = useState("");
   const [loading, setLoading] = useState(false);
   const [generarBoleta, setGenerarBoleta] = useState(loadBoletaPref);
+
+  // Transbank PINpad
+  const [pinpadAvailable, setPinpadAvailable] = useState(false);
+  const [transbankStatus, setTransbankStatus] = useState<"idle" | "waiting" | "approved" | "failed">("idle");
+  const [cardAuthCode, setCardAuthCode] = useState<string | null>(null);
+  const [cardLast4, setCardLast4] = useState<string | null>(null);
+
+  useEffect(() => {
+    window.electronAPI?.transbankGetStatus?.().then((s) => {
+      if (s) setPinpadAvailable(s.connected);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setTransbankStatus("idle");
+    setCardAuthCode(null);
+    setCardLast4(null);
+  }, [method]);
 
   const cashNum = parseInt(cashAmount) || 0;
   const cardNum = parseInt(cardAmount) || 0;
@@ -47,9 +69,29 @@ export default function PaymentModal({ total, onComplete, onClose, orderIds }: P
 
   const canPay =
     (method === "cash" && cashNum >= total) ||
-    (method === "card") ||
+    (method === "card" && (!pinpadAvailable || transbankStatus === "approved")) ||
     (method === "transfer") ||
     (method === "mixed" && mixedTotal >= total);
+
+  const handleTransbankSale = async () => {
+    setTransbankStatus("waiting");
+    try {
+      const ticket = String(Date.now()).slice(-6);
+      const res = await window.electronAPI!.transbankSale!({ amount: total, ticket });
+      if (res.success) {
+        setCardAuthCode(res.authCode ?? null);
+        setCardLast4(res.last4 ?? null);
+        setTransbankStatus("approved");
+        toast.success("Pago aprobado por PINpad");
+      } else {
+        setTransbankStatus("failed");
+        toast.error(res.error ?? "Pago rechazado por el PINpad");
+      }
+    } catch {
+      setTransbankStatus("failed");
+      toast.error("Error al comunicarse con el PINpad");
+    }
+  };
 
   const handleGenerarBoletaToggle = () => {
     const next = !generarBoleta;
@@ -74,6 +116,9 @@ export default function PaymentModal({ total, onComplete, onClose, orderIds }: P
           unit_price_override: i.unit_price,
         })),
         ...(orderIds && orderIds.length > 0 ? { order_ids: orderIds } : {}),
+        ...(customerId ? { customer_id: customerId, points_to_redeem: pointsToRedeem } : {}),
+        ...(cardAuthCode ? { card_auth_code: cardAuthCode } : {}),
+        ...(cardLast4 ? { card_last4: cardLast4 } : {}),
       });
       onComplete(data, generarBoleta);
     } catch (err: any) {
@@ -105,6 +150,11 @@ export default function PaymentModal({ total, onComplete, onClose, orderIds }: P
         <div className="p-6 space-y-5">
           {/* Total */}
           <div className="text-center">
+            {loyaltyDiscount > 0 && (
+              <div className="text-sm text-emerald-600 font-medium mb-1">
+                Descuento puntos: −{formatCLP(loyaltyDiscount)}
+              </div>
+            )}
             <p className="text-gray-500">Total a cobrar</p>
             <p className="text-4xl font-bold text-gray-800">{formatCLP(total)}</p>
           </div>
@@ -126,6 +176,73 @@ export default function PaymentModal({ total, onComplete, onClose, orderIds }: P
               </button>
             ))}
           </div>
+
+          {/* Transbank PINpad (card method + PINpad connected) */}
+          {method === "card" && pinpadAvailable && (
+            <div className={`rounded-xl border p-4 ${
+              transbankStatus === "approved" ? "border-emerald-200 bg-emerald-50" :
+              transbankStatus === "waiting" ? "border-blue-200 bg-blue-50" :
+              transbankStatus === "failed" ? "border-red-200 bg-red-50" :
+              "border-gray-200 bg-gray-50"
+            }`}>
+              {transbankStatus === "idle" && (
+                <div className="text-center">
+                  <p className="text-sm text-gray-600 mb-3">Cobrar con PINpad Transbank</p>
+                  <button
+                    onClick={() => void handleTransbankSale()}
+                    className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700"
+                  >
+                    Cobrar {formatCLP(total)} con PINpad
+                  </button>
+                </div>
+              )}
+              {transbankStatus === "waiting" && (
+                <div className="text-center py-2">
+                  <div className="mx-auto mb-2 h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+                  <p className="text-sm font-medium text-blue-700">Esperando respuesta del PINpad...</p>
+                  <p className="text-xs text-blue-500 mt-1">Pide al cliente que inserte o acerque su tarjeta</p>
+                </div>
+              )}
+              {transbankStatus === "approved" && (
+                <div className="text-center">
+                  <p className="font-semibold text-emerald-700">Pago aprobado ✓</p>
+                  <p className="text-sm text-emerald-600 mt-1">
+                    Auth: {cardAuthCode}
+                    {cardLast4 && <span> · **** {cardLast4}</span>}
+                  </p>
+                  <button
+                    onClick={() => { setTransbankStatus("idle"); setCardAuthCode(null); setCardLast4(null); }}
+                    className="mt-2 text-xs text-gray-500 underline"
+                  >
+                    Volver a cobrar
+                  </button>
+                </div>
+              )}
+              {transbankStatus === "failed" && (
+                <div className="text-center">
+                  <p className="font-semibold text-red-600">Pago rechazado</p>
+                  <button
+                    onClick={() => setTransbankStatus("idle")}
+                    className="mt-2 w-full rounded-xl border border-red-200 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                  >
+                    Reintentar
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Card info (no PINpad) */}
+          {method === "card" && !pinpadAvailable && (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <div className="flex items-center gap-2 text-gray-700 mb-1">
+                <CreditCard size={16} />
+                <span className="font-semibold text-sm">Pago con tarjeta</span>
+              </div>
+              <p className="text-xs text-gray-500">Total a cobrar: <strong>{formatCLP(total)}</strong></p>
+              <p className="text-xs text-gray-400 mt-1">Confirma el pago antes de completar la venta.</p>
+            </div>
+          )}
 
           {/* Cash input */}
           {(method === "cash" || method === "mixed") && (

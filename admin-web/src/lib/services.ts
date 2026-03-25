@@ -24,6 +24,10 @@ import type {
   KardexEntry,
   KardexCreate,
   DashboardStats,
+  SalesTrendPoint,
+  HourlyPoint,
+  PaymentMethodPoint,
+  TopProduct,
   StoreConfig,
   PaginationMeta,
   Supplier,
@@ -33,6 +37,19 @@ import type {
   PurchaseOrderCreate,
   PurchaseOrderUpdate,
   ReceivePurchaseOrderInput,
+  Customer,
+  CustomerCreate,
+  CustomerUpdate,
+  LoyaltyConfig,
+  Notification,
+  Expense,
+  ExpenseCreate,
+  ExpenseUpdate,
+  ExpenseSummary,
+  Table,
+  TableCreate,
+  TableUpdate,
+  TableStatus,
 } from '../types'
 
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS !== 'false'
@@ -50,6 +67,26 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
   }
   const res = await api.get('/dashboard/stats')
   return res.data.data
+}
+
+export async function fetchSalesTrend(days = 7): Promise<SalesTrendPoint[]> {
+  const res = await api.get('/dashboard/analytics/sales-trend', { params: { days } })
+  return res.data
+}
+
+export async function fetchHourlySales(days = 7): Promise<HourlyPoint[]> {
+  const res = await api.get('/dashboard/analytics/hourly', { params: { days } })
+  return res.data
+}
+
+export async function fetchPaymentMethods(days = 7): Promise<PaymentMethodPoint[]> {
+  const res = await api.get('/dashboard/analytics/payment-methods', { params: { days } })
+  return res.data
+}
+
+export async function fetchTopProductsAnalytics(limit = 10, days = 30): Promise<TopProduct[]> {
+  const res = await api.get('/dashboard/analytics/top-products', { params: { limit, days } })
+  return res.data
 }
 
 // ── Products ──
@@ -573,4 +610,145 @@ export async function downloadReport(
   return new Blob([res.data], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   })
+}
+
+// ── Customers ──
+
+export async function fetchCustomers(search?: string): Promise<Customer[]> {
+  const res = await api.get('/customers/', { params: search ? { search } : {} })
+  return res.data
+}
+
+export async function createCustomer(data: CustomerCreate): Promise<Customer> {
+  const res = await api.post('/customers/', data)
+  return res.data
+}
+
+export async function updateCustomer(id: string, data: CustomerUpdate): Promise<Customer> {
+  const res = await api.put(`/customers/${id}`, data)
+  return res.data
+}
+
+export async function deleteCustomer(id: string): Promise<void> {
+  await api.delete(`/customers/${id}`)
+}
+
+export async function fetchCustomerHistory(id: string): Promise<Sale[]> {
+  const res = await api.get(`/customers/${id}/history`)
+  return res.data
+}
+
+export async function adjustCustomerPoints(id: string, delta: number): Promise<Customer> {
+  const res = await api.post(`/customers/${id}/adjust-points`, null, { params: { delta } })
+  return res.data
+}
+
+export async function fetchLoyaltyConfig(): Promise<LoyaltyConfig> {
+  const res = await api.get('/customers/loyalty-config')
+  return res.data
+}
+
+// ── Tables ──
+
+export async function fetchTables(): Promise<Table[]> {
+  const res = await api.get('/tables/')
+  return res.data
+}
+
+export async function fetchTablesStatus(): Promise<TableStatus[]> {
+  const res = await api.get('/tables/status')
+  return res.data
+}
+
+export async function createTable(data: TableCreate): Promise<Table> {
+  const res = await api.post('/tables/', data)
+  return res.data
+}
+
+export async function updateTable(id: string, data: TableUpdate): Promise<Table> {
+  const res = await api.put(`/tables/${id}`, data)
+  return res.data
+}
+
+export async function deleteTable(id: string): Promise<void> {
+  await api.delete(`/tables/${id}`)
+}
+
+// ── Expenses ──
+
+export async function fetchExpenses(params: {
+  date_from?: string
+  date_to?: string
+  category?: string
+  skip?: number
+  limit?: number
+} = {}): Promise<Expense[]> {
+  const res = await api.get('/expenses/', { params })
+  return res.data
+}
+
+export async function fetchExpenseCategories(): Promise<{ value: string; label: string }[]> {
+  const res = await api.get('/expenses/categories')
+  return res.data
+}
+
+export async function fetchExpenseSummary(dateFrom: string, dateTo: string): Promise<ExpenseSummary> {
+  const res = await api.get('/expenses/summary', { params: { date_from: dateFrom, date_to: dateTo } })
+  return res.data
+}
+
+export async function createExpense(data: ExpenseCreate): Promise<Expense> {
+  const res = await api.post('/expenses/', data)
+  return res.data
+}
+
+export async function updateExpense(id: string, data: ExpenseUpdate): Promise<Expense> {
+  const res = await api.put(`/expenses/${id}`, data)
+  return res.data
+}
+
+export async function deleteExpense(id: string): Promise<void> {
+  await api.delete(`/expenses/${id}`)
+}
+
+// ── Notifications ──
+
+export async function fetchNotifications(): Promise<Notification[]> {
+  const res = await api.get('/notifications/')
+  return res.data
+}
+
+export async function fetchUnreadCount(): Promise<number> {
+  const res = await api.get('/notifications/unread-count')
+  return res.data.count
+}
+
+export async function markNotificationRead(id: string): Promise<void> {
+  await api.post(`/notifications/${id}/read`)
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  await api.post('/notifications/read-all')
+}
+
+// ── Cloud Sync ──
+
+export async function fetchSyncStatus() {
+  const res = await api.get('/sync/status')
+  return res.data
+}
+
+export async function fetchSyncConfig() {
+  const res = await api.get('/sync/config')
+  return res.data
+}
+
+export async function updateSyncConfig(data: { supabase_url: string; supabase_key: string; branch_id: string }) {
+  const res = await api.put('/sync/config', data)
+  return res.data
+}
+
+export async function triggerSync(): Promise<{ message: string; log_id: number }> {
+  const res = await api.post('/sync/trigger')
+  return res.data
 }

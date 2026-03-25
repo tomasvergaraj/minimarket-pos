@@ -1,3 +1,6 @@
+import asyncio
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -7,11 +10,45 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.deps import require_admin
 from app.core.config import ROOT_DIR, settings
-from app.api.routes import products, sales, cash, kardex, reports, users, dashboard, orders, license, categories, suppliers, purchases
+from app.api.routes import products, sales, cash, kardex, reports, users, dashboard, orders, license, categories, suppliers, purchases, promotions, customers, notifications, expenses, tables, sync
 from app.schemas.config import ConfigUpdate, ConfigResponse
 from app.tax.sii.boleta import router as sii_router
 
-app = FastAPI(title="Nexo Server", version="1.0.0")
+_log = logging.getLogger(__name__)
+
+
+async def _periodic_jobs() -> None:
+    """Background loop: stock alerts every hour, slow-mover check once per day."""
+    from app.db.session import SessionLocal
+    from app.services.notification_service import run_stock_alerts, run_slow_mover_check, create_daily_summary
+
+    day_counter = 0
+    while True:
+        await asyncio.sleep(3600)
+        day_counter += 1
+        try:
+            with SessionLocal() as db:
+                run_stock_alerts(db)
+                if day_counter % 8 == 0:   # ~every 8 h → daily at first opportunity
+                    run_slow_mover_check(db)
+                if day_counter % 23 == 0:  # ~every 23 h → daily summary
+                    create_daily_summary(db)
+        except Exception as exc:
+            _log.error("Periodic notification job error: %s", exc)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(_periodic_jobs())
+    yield
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+
+
+app = FastAPI(title="Nexo Server", version="1.0.0", lifespan=lifespan)
 
 # Serve uploaded product images and other static assets
 _STATIC_DIR = ROOT_DIR / "static"
@@ -37,6 +74,8 @@ ADMIN_COMPAT_PATHS = (
     "config",
     "suppliers",
     "purchases",
+    "promotions",
+    "customers",
 )
 ADMIN_COMPAT_STORAGE_RESET_SCRIPT = """
 (() => {
@@ -85,6 +124,12 @@ app.include_router(license.router, prefix="/api")
 app.include_router(categories.router, prefix="/api")
 app.include_router(suppliers.router, prefix="/api")
 app.include_router(purchases.router, prefix="/api")
+app.include_router(promotions.router, prefix="/api")
+app.include_router(customers.router, prefix="/api")
+app.include_router(notifications.router, prefix="/api")
+app.include_router(expenses.router, prefix="/api")
+app.include_router(tables.router, prefix="/api")
+app.include_router(sync.router, prefix="/api")
 app.include_router(sii_router, prefix="/api")
 
 
@@ -99,6 +144,7 @@ def get_config():
         "store_name": settings.STORE_NAME,
         "store_rut": settings.STORE_RUT,
         "store_address": settings.STORE_ADDRESS,
+        "smtp_configured": settings.smtp_configured,
     }
 
 

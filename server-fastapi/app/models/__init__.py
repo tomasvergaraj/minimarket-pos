@@ -8,6 +8,12 @@ from app.models.order import Order, OrderItem
 from app.models.license_state import LicenseState
 from app.models.supplier import Supplier
 from app.models.purchase_order import PurchaseOrder, PurchaseOrderItem
+from app.models.promotion import Promotion
+from app.models.customer import Customer
+from app.models.notification import Notification
+from app.models.expense import Expense
+from app.models.table import Table
+from app.models.sync_log import SyncLog
 
 __all__ = [
     "Product", "Sale", "SaleItem",
@@ -18,4 +24,10 @@ __all__ = [
     "LicenseState",
     "Supplier",
     "PurchaseOrder", "PurchaseOrderItem",
+    "Promotion",
+    "Customer",
+    "Notification",
+    "Expense",
+    "Table",
+    "SyncLog",
 ]

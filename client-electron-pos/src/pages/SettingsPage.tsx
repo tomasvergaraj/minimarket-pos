@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   Clock3,
   Copy,
+  CreditCard,
   KeyRound,
   Maximize,
   Minimize,
@@ -20,6 +21,7 @@ import {
 } from "lucide-react";
 
 const PRINTER_KEY = "printer_name";
+const TRANSBANK_PORT_KEY = "transbank_port";
 
 function formatDate(value: string | null): string {
   if (!value) return "-";
@@ -60,6 +62,14 @@ export default function SettingsPage() {
   const [loadingLicense, setLoadingLicense] = useState(false);
   const [activatingLicense, setActivatingLicense] = useState(false);
   const [licenseDocument, setLicenseDocument] = useState("");
+
+  // Transbank PINpad
+  const [transbankPorts, setTransbankPorts] = useState<string[]>([]);
+  const [transbankPort, setTransbankPort] = useState(localStorage.getItem(TRANSBANK_PORT_KEY) ?? "");
+  const [transbankConnected, setTransbankConnected] = useState(false);
+  const [transbankConnecting, setTransbankConnecting] = useState(false);
+  const [loadingPorts, setLoadingPorts] = useState(false);
+  const [closingDay, setClosingDay] = useState(false);
 
   const canManageLicense = user?.role === "admin";
   const backTarget = register && session ? "/pos" : "/";
@@ -121,6 +131,73 @@ export default function SettingsPage() {
   useEffect(() => {
     loadPrinters();
   }, []);
+
+  const loadTransbankPorts = async () => {
+    if (!window.electronAPI?.transbankListPorts) return;
+    setLoadingPorts(true);
+    try {
+      const res = await window.electronAPI.transbankListPorts();
+      if (res.success) setTransbankPorts(res.ports);
+      else toast.error(res.error ?? "No se pudo listar puertos COM");
+    } catch {
+      toast.error("Error al listar puertos COM");
+    } finally {
+      setLoadingPorts(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!window.electronAPI?.transbankListPorts) return;
+    loadTransbankPorts();
+    window.electronAPI.transbankGetStatus?.().then((s) => {
+      if (s) setTransbankConnected(s.connected);
+    });
+  }, []);
+
+  const handleTransbankConnect = async () => {
+    if (!transbankPort) {
+      toast.error("Selecciona un puerto COM");
+      return;
+    }
+    setTransbankConnecting(true);
+    try {
+      const res = await window.electronAPI!.transbankConnect!(transbankPort);
+      if (res.success) {
+        setTransbankConnected(true);
+        localStorage.setItem(TRANSBANK_PORT_KEY, transbankPort);
+        toast.success("PINpad conectado");
+      } else {
+        toast.error(res.error ?? "No se pudo conectar al PINpad");
+      }
+    } catch {
+      toast.error("Error al conectar PINpad");
+    } finally {
+      setTransbankConnecting(false);
+    }
+  };
+
+  const handleTransbankDisconnect = async () => {
+    try {
+      await window.electronAPI?.transbankDisconnect?.();
+      setTransbankConnected(false);
+      toast.success("PINpad desconectado");
+    } catch {
+      toast.error("Error al desconectar PINpad");
+    }
+  };
+
+  const handleTransbankCloseDay = async () => {
+    setClosingDay(true);
+    try {
+      const res = await window.electronAPI!.transbankCloseDay!();
+      if (res.success) toast.success("Cierre del día completado");
+      else toast.error(res.error ?? "Error en cierre del día");
+    } catch {
+      toast.error("Error al ejecutar cierre del día");
+    } finally {
+      setClosingDay(false);
+    }
+  };
 
   const reloadLicenseStatus = async () => {
     if (!canManageLicense) return;
@@ -313,6 +390,81 @@ export default function SettingsPage() {
                 </button>
               </div>
             </div>
+
+            {window.electronAPI?.transbankListPorts && (
+              <div className="rounded-2xl bg-white p-6 shadow">
+                <div className="flex items-center gap-2">
+                  <CreditCard size={16} className="text-gray-400" />
+                  <h2 className="text-xl font-bold text-gray-800">Transbank PINpad</h2>
+                </div>
+
+                <div className="mt-6 space-y-4">
+                  <div className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm ${
+                    transbankConnected
+                      ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border border-gray-200 bg-gray-50 text-gray-600"
+                  }`}>
+                    <div className={`h-2 w-2 rounded-full ${transbankConnected ? "bg-emerald-500" : "bg-gray-400"}`} />
+                    {transbankConnected ? "PINpad conectado" : "PINpad desconectado"}
+                  </div>
+
+                  <div>
+                    <div className="mb-1 flex items-center justify-between">
+                      <label className="block text-sm font-medium text-gray-700">Puerto COM</label>
+                      <button
+                        onClick={() => void loadTransbankPorts()}
+                        disabled={loadingPorts}
+                        className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                      >
+                        <RefreshCw size={12} className={loadingPorts ? "animate-spin" : ""} />
+                        Actualizar
+                      </button>
+                    </div>
+                    <select
+                      value={transbankPort}
+                      onChange={(e) => setTransbankPort(e.target.value)}
+                      className="w-full rounded-lg border px-4 py-2 text-sm"
+                      disabled={loadingPorts || transbankConnected}
+                    >
+                      <option value="">-- Selecciona puerto --</option>
+                      {transbankPorts.map((port) => (
+                        <option key={port} value={port}>{port}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex gap-2">
+                    {!transbankConnected ? (
+                      <button
+                        onClick={() => void handleTransbankConnect()}
+                        disabled={transbankConnecting || !transbankPort}
+                        className="flex-1 rounded-lg bg-blue-600 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {transbankConnecting ? "Conectando..." : "Conectar"}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => void handleTransbankDisconnect()}
+                        className="flex-1 rounded-lg border border-gray-200 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        Desconectar
+                      </button>
+                    )}
+                    <button
+                      onClick={() => void handleTransbankCloseDay()}
+                      disabled={!transbankConnected || closingDay}
+                      className="flex-1 rounded-lg border border-amber-200 bg-amber-50 py-2 text-sm font-medium text-amber-700 disabled:cursor-not-allowed disabled:opacity-50 hover:bg-amber-100"
+                    >
+                      {closingDay ? "Cerrando..." : "Cierre del día"}
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-gray-500">
+                    El PINpad se conecta por USB/Serial. Selecciona el puerto COM asignado por Windows.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="rounded-2xl bg-white p-6 shadow">

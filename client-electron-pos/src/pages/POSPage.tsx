@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
+  ChefHat,
   ClipboardList,
+  Gift,
   LogOut,
   Minus,
   Monitor,
@@ -13,6 +15,7 @@ import {
   Search,
   Settings,
   Trash2,
+  UserCheck,
   X,
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -21,7 +24,8 @@ import { useAuthStore } from "@/stores/authStore";
 import { useCartStore } from "@/stores/cartStore";
 import { formatCLP } from "@/utils/format";
 import api from "@/services/api";
-import type { CartItem, Order, Product, Sale } from "@/types";
+import type { CartItem, Customer, LoyaltyConfig, Order, Product, Promotion, Sale, TableStatus } from "@/types";
+import { computePromotion } from "@/utils/promotions";
 import PaymentModal from "@/components/PaymentModal";
 import CloseSessionModal from "@/components/CloseSessionModal";
 import ReceiptPreviewModal from "@/components/ReceiptPreviewModal";
@@ -29,6 +33,7 @@ import OrderPreviewModal from "@/components/OrderPreviewModal";
 import FavoritesPanel from "@/components/FavoritesPanel";
 import CategoryGrid from "@/components/CategoryGrid";
 import OrdersModal from "@/components/OrdersModal";
+import TableMapModal from "@/components/TableMapModal";
 import nexoIconUrl from "../assets/nexo-icon.svg";
 
 function stockColor(stock: number, minStock: number) {
@@ -150,10 +155,24 @@ export default function POSPage() {
 
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [showOrderRef, setShowOrderRef] = useState(false);
+  const [showTableMap, setShowTableMap] = useState(false);
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+  const [selectedTableName, setSelectedTableName] = useState<string | null>(null);
   const [orderRef, setOrderRef] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
   const [savingOrder, setSavingOrder] = useState(false);
   const [customerDisplayOpen, setCustomerDisplayOpen] = useState(false);
+  const [kitchenDisplayOpen, setKitchenDisplayOpen] = useState(false);
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [promoLabels, setPromoLabels] = useState<Record<string, string | null>>({});
+
+  // Loyalty / customer
+  const [loyaltyConfig, setLoyaltyConfig] = useState<LoyaltyConfig>({ points_per_thousand: 1, point_value: 10 });
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerResults, setCustomerResults] = useState<Customer[]>([]);
+  const [customerSearching, setCustomerSearching] = useState(false);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
 
   // Keep customer display in sync with cart
   useEffect(() => {
@@ -175,19 +194,53 @@ export default function POSPage() {
     window.electronAPI?.isCustomerDisplayOpen?.().then(setCustomerDisplayOpen).catch(() => {});
   }, []);
 
+  // Fetch active promotions on mount
+  useEffect(() => {
+    api.get("/promotions/active")
+      .then(({ data }) => setPromotions(Array.isArray(data) ? data : (data.data ?? [])))
+      .catch(() => {});
+  }, []);
+
+  // Fetch loyalty config on mount
+  useEffect(() => {
+    api.get("/customers/loyalty-config")
+      .then(({ data }) => setLoyaltyConfig(data))
+      .catch(() => {});
+  }, []);
+
+  const applyPromoToItem = useCallback((product: Product, qty: number, cartKey: string) => {
+    if (promotions.length === 0) return;
+    const { price, label } = computePromotion(product, qty, promotions);
+    const base = product.is_on_offer && product.discount_price ? product.discount_price : product.sell_price;
+    if (price !== base) updatePrice(cartKey, price);
+    setPromoLabels((prev) => ({ ...prev, [cartKey]: label }));
+  }, [promotions, updatePrice]);
+
   const tryAddItem = useCallback((product: Product) => {
     if (product.stock <= 0) {
       toast.error(`${product.name}: sin stock`);
       return;
     }
-
     const ok = addItem(product, 1);
     if (!ok) {
       toast.error(`Stock insuficiente - disponibles: ${product.stock}`);
     } else {
+      applyPromoToItem(product, 1, product.id);
       toast.success(`${product.name} agregado`);
     }
-  }, [addItem]);
+  }, [addItem, applyPromoToItem]);
+
+  const handleQuantityChange = useCallback((cartKey: string, newQty: number) => {
+    const item = useCartStore.getState().items.find((i) => i.cartKey === cartKey);
+    if (!item) return;
+    const ok = updateQuantity(cartKey, newQty);
+    if (!ok) {
+      toast.error("Stock insuficiente");
+      return;
+    }
+    if (newQty > 0) applyPromoToItem(item.product, newQty, cartKey);
+    else setPromoLabels((prev) => { const n = { ...prev }; delete n[cartKey]; return n; });
+  }, [updateQuantity, applyPromoToItem]);
 
   const clearScheduledSearch = useCallback(() => {
     if (searchTimeoutRef.current !== null) {
@@ -293,15 +346,14 @@ export default function POSPage() {
       // NumpadAdd / + key → increment last item
       if (event.key === "+" || event.key === "NumpadAdd") {
         event.preventDefault();
-        const ok = updateQuantity(lastItem.cartKey, lastItem.quantity + 1);
-        if (!ok) toast.error("Stock insuficiente");
+        handleQuantityChange(lastItem.cartKey, lastItem.quantity + 1);
         return;
       }
 
       // NumpadSubtract / - key → decrement last item
       if (event.key === "-" || event.key === "NumpadSubtract") {
         event.preventDefault();
-        updateQuantity(lastItem.cartKey, lastItem.quantity - 1);
+        handleQuantityChange(lastItem.cartKey, lastItem.quantity - 1);
         return;
       }
 
@@ -330,6 +382,29 @@ export default function POSPage() {
     setOrderRef("");
     setOrderNotes("");
     setShowOrderRef(false);
+    setSelectedTableId(null);
+    setSelectedTableName(null);
+  }, []);
+
+  const resetCustomer = useCallback(() => {
+    setSelectedCustomer(null);
+    setCustomerSearch("");
+    setCustomerResults([]);
+    setPointsToRedeem(0);
+  }, []);
+
+  const handleCustomerSearch = useCallback(async (q: string) => {
+    setCustomerSearch(q);
+    if (q.trim().length < 2) { setCustomerResults([]); return; }
+    setCustomerSearching(true);
+    try {
+      const { data } = await api.get("/customers/search", { params: { q: q.trim(), limit: 6 } });
+      setCustomerResults(Array.isArray(data) ? data : []);
+    } catch {
+      setCustomerResults([]);
+    } finally {
+      setCustomerSearching(false);
+    }
   }, []);
 
   const toggleCustomerDisplay = async () => {
@@ -354,8 +429,14 @@ export default function POSPage() {
     });
     clear();
     resetOrderDraft();
+    resetCustomer();
     setShowPayment(false);
-    toast.success(`Venta #${sale.sale_number} completada`);
+    const earned = (sale as Sale & { points_earned?: number }).points_earned ?? 0;
+    if (earned > 0) {
+      toast.success(`Venta #${sale.sale_number} completada · +${earned} pts`);
+    } else {
+      toast.success(`Venta #${sale.sale_number} completada`);
+    }
     if (showReceipt) {
       setLastSale(sale);
     }
@@ -368,6 +449,8 @@ export default function POSPage() {
     setActiveOrder(order);
     setOrderRef(order.reference ?? "");
     setOrderNotes(order.notes ?? "");
+    setSelectedTableId(order.table_id ?? null);
+    setSelectedTableName(order.table_id ? (order.reference ?? null) : null);
     setShowOrderRef(false);
   };
 
@@ -387,6 +470,7 @@ export default function POSPage() {
         register_id: register.id,
         reference: orderRef.trim() || null,
         notes: orderNotes.trim() || null,
+        table_id: selectedTableId ?? null,
         items: items.map((item) => ({ product_id: item.product.id, quantity: item.quantity })),
       };
 
@@ -425,7 +509,14 @@ export default function POSPage() {
   const handleClearActiveOrder = () => {
     clear();
     resetOrderDraft();
+    resetCustomer();
   };
+
+  const loyaltyDiscount = Math.min(
+    pointsToRedeem * loyaltyConfig.point_value,
+    total()
+  );
+  const effectiveTotal = Math.max(0, total() - loyaltyDiscount);
 
   const showFavorites = searchResults.length === 0;
 
@@ -453,6 +544,25 @@ export default function POSPage() {
             }`}
           >
             <Monitor size={16} />
+          </button>
+          <button
+            onClick={async () => {
+              if (kitchenDisplayOpen) {
+                await window.electronAPI?.closeKitchenDisplay?.();
+                setKitchenDisplayOpen(false);
+              } else {
+                await window.electronAPI?.openKitchenDisplay?.();
+                setKitchenDisplayOpen(true);
+              }
+            }}
+            title={kitchenDisplayOpen ? "Cerrar pantalla cocina" : "Abrir pantalla cocina (KDS)"}
+            className={`flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg transition ${
+              kitchenDisplayOpen
+                ? "bg-orange-100 text-orange-700 hover:bg-orange-200"
+                : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+            }`}
+          >
+            <ChefHat size={16} />
           </button>
           <button
             onClick={() => setShowOrders(true)}
@@ -564,7 +674,7 @@ export default function POSPage() {
 
           {showFavorites && (
             <>
-              <CategoryGrid onProductClick={tryAddItem} cartItems={items} />
+              <CategoryGrid onProductClick={tryAddItem} cartItems={items} promotions={promotions} />
               <FavoritesPanel onProductClick={tryAddItem} />
             </>
           )}
@@ -620,6 +730,75 @@ export default function POSPage() {
             </div>
           )}
 
+          {/* Customer loyalty strip */}
+          <div className="px-4 py-2 border-b bg-gray-50">
+            {selectedCustomer ? (
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <UserCheck size={14} className="text-emerald-600 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-semibold text-gray-800 truncate">{selectedCustomer.name}</p>
+                    <p className="text-[11px] text-amber-600 font-medium">{selectedCustomer.points_balance} pts disponibles</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {selectedCustomer.points_balance > 0 && (
+                    <div className="flex items-center gap-1">
+                      <Gift size={12} className="text-amber-500" />
+                      <input
+                        type="number"
+                        min={0}
+                        max={selectedCustomer.points_balance}
+                        value={pointsToRedeem || ""}
+                        onChange={(e) => {
+                          const v = Math.min(Math.max(0, parseInt(e.target.value) || 0), selectedCustomer.points_balance);
+                          setPointsToRedeem(v);
+                        }}
+                        placeholder="0 pts"
+                        className="w-16 text-[11px] border border-amber-300 rounded px-1.5 py-1 text-center focus:outline-none focus:border-amber-500"
+                      />
+                      {loyaltyDiscount > 0 && (
+                        <span className="text-[11px] text-emerald-600 font-semibold">−${loyaltyDiscount.toLocaleString("es-CL")}</span>
+                      )}
+                    </div>
+                  )}
+                  <button onClick={resetCustomer} className="text-gray-400 hover:text-gray-600 p-1">
+                    <X size={13} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="relative">
+                <UserCheck size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={customerSearch}
+                  onChange={(e) => void handleCustomerSearch(e.target.value)}
+                  placeholder="Buscar cliente (teléfono, RUT…)"
+                  className="w-full pl-7 pr-3 py-1.5 text-[12px] border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400"
+                />
+                {customerSearching && (
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">…</span>
+                )}
+                {customerResults.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
+                    {customerResults.map((c) => (
+                      <button
+                        key={c.id}
+                        className="w-full text-left px-3 py-2 hover:bg-indigo-50 border-b last:border-0 text-[12px]"
+                        onClick={() => { setSelectedCustomer(c); setCustomerSearch(""); setCustomerResults([]); setPointsToRedeem(0); }}
+                      >
+                        <span className="font-medium">{c.name}</span>
+                        <span className="text-gray-400 ml-2">{c.phone ?? c.rut ?? ""}</span>
+                        <span className="text-amber-600 ml-2 text-[11px]">{c.points_balance} pts</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="p-4 border-b">
             <div className="flex items-center justify-between">
               <h2 className="font-bold text-gray-800 text-lg">Carrito</h2>
@@ -660,7 +839,9 @@ export default function POSPage() {
                           {item.product.is_pack && (
                             <span className="text-xs text-purple-600 font-semibold">Pack x{item.product.units_contained}</span>
                           )}
-                          {item.product.is_on_offer && (
+                          {promoLabels[item.cartKey] ? (
+                            <span className="text-xs text-green-600 font-semibold ml-1">{promoLabels[item.cartKey]}</span>
+                          ) : item.product.is_on_offer && (
                             <span className="text-xs text-red-600 font-semibold ml-1">OFERTA</span>
                           )}
                         </div>
@@ -672,17 +853,14 @@ export default function POSPage() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => updateQuantity(item.cartKey, item.quantity - 1)}
+                            onClick={() => handleQuantityChange(item.cartKey, item.quantity - 1)}
                             className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg"
                           >
                             <Minus size={14} />
                           </button>
                           <span className="w-10 text-center font-mono font-bold">{item.quantity}</span>
                           <button
-                            onClick={() => {
-                              const ok = updateQuantity(item.cartKey, item.quantity + 1);
-                              if (!ok) toast.error("Stock insuficiente");
-                            }}
+                            onClick={() => handleQuantityChange(item.cartKey, item.quantity + 1)}
                             disabled={atLimit}
                             className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg"
                           >
@@ -743,11 +921,37 @@ export default function POSPage() {
           <div className="border-t p-4 space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Total</span>
-              <span className="text-3xl font-bold text-gray-800">{formatCLP(total())}</span>
+              <div className="text-right">
+                {loyaltyDiscount > 0 && (
+                  <p className="text-sm text-gray-400 line-through">{formatCLP(total())}</p>
+                )}
+                <span className="text-3xl font-bold text-gray-800">{formatCLP(effectiveTotal)}</span>
+              </div>
             </div>
 
             {showOrderRef ? (
               <div className="space-y-2">
+                {/* Table selector */}
+                {!activeOrder && (
+                  <button
+                    type="button"
+                    onClick={() => setShowTableMap(true)}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-sm transition ${
+                      selectedTableId
+                        ? "border-blue-400 bg-blue-50 text-blue-700 font-medium"
+                        : "border-gray-200 hover:border-blue-300 text-gray-500 hover:text-blue-600"
+                    }`}
+                  >
+                    <span>{selectedTableName ? `Mesa: ${selectedTableName}` : "Seleccionar mesa (opcional)"}</span>
+                    {selectedTableId && (
+                      <span
+                        role="button"
+                        onClick={(e) => { e.stopPropagation(); setSelectedTableId(null); setSelectedTableName(null); }}
+                        className="text-blue-400 hover:text-blue-700 ml-2"
+                      >×</span>
+                    )}
+                  </button>
+                )}
                 <input
                   value={orderRef}
                   onChange={(event) => setOrderRef(event.target.value)}
@@ -814,7 +1018,7 @@ export default function POSPage() {
               disabled={items.length === 0}
               className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white py-4 rounded-xl font-bold text-lg transition"
             >
-              Cobrar (F4)
+              Cobrar {loyaltyDiscount > 0 ? formatCLP(effectiveTotal) : "(F4)"}
             </button>
           </div>
         </div>
@@ -822,10 +1026,13 @@ export default function POSPage() {
 
       {showPayment && (
         <PaymentModal
-          total={total()}
+          total={effectiveTotal}
           orderIds={activeOrder ? [activeOrder.id] : undefined}
           onComplete={(sale, showReceipt) => handlePaymentComplete(sale, showReceipt)}
           onClose={() => setShowPayment(false)}
+          customerId={selectedCustomer?.id}
+          pointsToRedeem={pointsToRedeem}
+          loyaltyDiscount={loyaltyDiscount}
         />
       )}
 
@@ -854,6 +1061,18 @@ export default function POSPage() {
         <OrdersModal
           onClose={() => setShowOrders(false)}
           onLoadOrder={handleLoadOrder}
+        />
+      )}
+
+      {showTableMap && (
+        <TableMapModal
+          onSelect={(table: TableStatus) => {
+            setSelectedTableId(table.id);
+            setSelectedTableName(table.name);
+            setOrderRef(table.name);
+            setShowTableMap(false);
+          }}
+          onClose={() => setShowTableMap(false)}
         />
       )}
     </div>

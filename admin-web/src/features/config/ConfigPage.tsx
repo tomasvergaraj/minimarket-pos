@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
+  CheckCircle2,
   Clock3,
   Copy,
   KeyRound,
+  Mail,
   Save,
   Server,
   ShieldCheck,
+  XCircle,
 } from 'lucide-react'
 import PageHeader from '../../components/patterns/PageHeader'
 import Input from '../../components/ui/Input'
@@ -181,6 +184,29 @@ export default function ConfigPage() {
             <Button size="sm" variant="secondary" type="button" onClick={handleSaveServerUrl}>
               Guardar
             </Button>
+          </div>
+        </div>
+
+        <div className="bg-surface-card rounded-lg border border-border p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <Mail className="w-4 h-4 text-text-muted" />
+            <h3 className="text-[13px] font-semibold text-text-secondary">Recibos por Email (SMTP)</h3>
+          </div>
+          <p className="text-xs text-text-muted">
+            Configura las variables <code>SMTP_HOST</code>, <code>SMTP_USER</code> y <code>SMTP_PASSWORD</code> en el archivo <code>.env</code> del backend para habilitar el envío de recibos digitales.
+          </p>
+          <div className="flex items-center gap-2">
+            {config.smtp_configured ? (
+              <>
+                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                <span className="text-[13px] text-green-700 font-medium">SMTP configurado — envío de recibos activo</span>
+              </>
+            ) : (
+              <>
+                <XCircle className="w-4 h-4 text-text-muted" />
+                <span className="text-[13px] text-text-muted">SMTP no configurado — recibos por email desactivados</span>
+              </>
+            )}
           </div>
         </div>
 

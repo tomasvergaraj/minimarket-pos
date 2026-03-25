@@ -9,6 +9,7 @@ import POSPage from "@/pages/POSPage";
 import SettingsPage from "@/pages/SettingsPage";
 import UpdateBanner from "@/components/UpdateBanner";
 import CustomerDisplayPage from "@/pages/CustomerDisplayPage";
+import KitchenDisplayPage from "@/pages/KitchenDisplayPage";
 
 export default function App() {
   const user = useAuthStore((s) => s.user);
@@ -16,9 +17,12 @@ export default function App() {
   const session = useAuthStore((s) => s.session);
   const location = useLocation();
 
-  // Customer display window: bypass all auth logic
+  // Bypass auth for secondary windows
   if (location.pathname === "/customer-display") {
     return <CustomerDisplayPage />;
+  }
+  if (location.pathname === "/kitchen-display") {
+    return <KitchenDisplayPage />;
   }
 
   return (

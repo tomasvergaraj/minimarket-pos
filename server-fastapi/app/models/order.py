@@ -28,6 +28,10 @@ class Order(Base):
     notes: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     # FK to sale — set when this comanda is paid/closed
     sale_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("sales.id"), nullable=True)
+    # FK to table — which table this order belongs to
+    table_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("tables.id", ondelete="SET NULL"), nullable=True)
+    # Whether the customer has requested the bill
+    bill_requested: Mapped[bool] = mapped_column(sa.Boolean, default=False, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

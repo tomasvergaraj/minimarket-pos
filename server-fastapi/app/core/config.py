@@ -24,6 +24,25 @@ class Settings(BaseSettings):
     LICENSE_PUBLIC_KEY_PATH: str = ""
     SUPABASE_URL: str = ""
     SUPABASE_KEY: str = ""
+    # Identificador único de esta sucursal para sincronización multi-sucursal
+    BRANCH_ID: str = "default"
+
+    # Loyalty / fidelización
+    LOYALTY_POINTS_PER_THOUSAND: int = 1   # puntos por cada $1.000 gastados
+    LOYALTY_POINT_VALUE: int = 10          # valor en CLP de cada punto al canjear
+
+    # SMTP — recibos digitales por email
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_NAME: str = ""   # si vacío usa STORE_NAME
+    SMTP_FROM_EMAIL: str = ""  # si vacío usa SMTP_USER
+    SMTP_USE_TLS: bool = True
+
+    @property
+    def smtp_configured(self) -> bool:
+        return bool(self.SMTP_HOST and self.SMTP_USER and self.SMTP_PASSWORD)
     STORE_NAME: str = "Nexo"
     STORE_RUT: str = ""
     STORE_ADDRESS: str = ""

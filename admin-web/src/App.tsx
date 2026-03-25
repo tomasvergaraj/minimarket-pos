@@ -16,6 +16,11 @@ import ReportsPage from './features/reports/ReportsPage'
 import ConfigPage from './features/config/ConfigPage'
 import SuppliersPage from './features/suppliers/SuppliersPage'
 import PurchasesPage from './features/purchases/PurchasesPage'
+import PromotionsPage from './features/promotions/PromotionsPage'
+import CustomersPage from './features/customers/CustomersPage'
+import ExpensesPage from './features/expenses/ExpensesPage'
+import TablesPage from './features/tables/TablesPage'
+import SyncPage from './features/sync/SyncPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -58,6 +63,11 @@ export default function App() {
                 <Route path="/config" element={<ConfigPage />} />
                 <Route path="/suppliers" element={<SuppliersPage />} />
                 <Route path="/purchases" element={<PurchasesPage />} />
+                <Route path="/promotions" element={<PromotionsPage />} />
+                <Route path="/customers" element={<CustomersPage />} />
+                <Route path="/expenses" element={<ExpensesPage />} />
+                <Route path="/tables" element={<TablesPage />} />
+                <Route path="/sync" element={<SyncPage />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

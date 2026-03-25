@@ -12,6 +12,7 @@ class OrderCreate(BaseModel):
     seller_id: str | None = None
     reference: str | None = None
     notes: str | None = None
+    table_id: str | None = None
     items: list[OrderItemIn] = []
 
 
@@ -20,6 +21,8 @@ class OrderPatch(BaseModel):
     items: list[OrderItemIn] | None = None
     reference: str | None = None
     notes: str | None = None
+    table_id: str | None = None
+    bill_requested: bool | None = None
 
 
 class OrderItemOut(BaseModel):
@@ -43,6 +46,8 @@ class OrderOut(BaseModel):
     reference: str | None
     notes: str | None
     sale_id: str | None
+    table_id: str | None
+    bill_requested: bool
     created_at: datetime
     updated_at: datetime
     items: list[OrderItemOut]

@@ -60,7 +60,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const { data } = await api.post(`/cash/sessions/${session.id}/close`, {
       closing_amount: closingAmount,
     });
-    set({ session: null });
+    // Do NOT clear session here — the modal needs to stay mounted to show the
+    // resumen visual. Session is cleared when the user clicks "Cerrar sesión"
+    // which calls logout() → set({ session: null, ... }).
     return data;
   },
 

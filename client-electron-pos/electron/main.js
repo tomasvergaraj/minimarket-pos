@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, globalShortcut, dialog, shell, screen } = require("electron");
+const { app, BrowserWindow, ipcMain, globalShortcut, dialog, shell, screen, clipboard } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
 const { execFile } = require("node:child_process");
@@ -21,6 +21,10 @@ const THERMAL_PAGE_WIDTH_INCHES = 3.15;
 
 let mainWindow;
 let customerDisplayWindow = null;
+let kitchenDisplayWindow = null;
+
+// ── Transbank POS ─────────────────────────────────────────────────────────────
+let transbankPOS = null;      // POSIntegrado instance (lazy init)
 
 // Persist update state so renderer can query it after mounting
 let updateState = "idle"; // "idle" | "downloading" | "ready"
@@ -365,6 +369,33 @@ function buildWhatsAppUrl({ text, phoneNumber }) {
   return `${baseUrl}?text=${encodeURIComponent(message)}`;
 }
 
+function createKitchenDisplayWindow() {
+  kitchenDisplayWindow = new BrowserWindow({
+    width: 1024,
+    height: 768,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+    title: "Cocina — Nexo KDS",
+    autoHideMenuBar: true,
+  });
+
+  const isDev = !app.isPackaged;
+  if (isDev) {
+    kitchenDisplayWindow.loadURL("http://localhost:5173/#/kitchen-display");
+  } else {
+    kitchenDisplayWindow.loadFile(path.join(__dirname, "../dist/index.html"), {
+      hash: "kitchen-display",
+    });
+  }
+
+  kitchenDisplayWindow.on("closed", () => {
+    kitchenDisplayWindow = null;
+  });
+}
+
 function createCustomerDisplayWindow() {
   const displays = screen.getAllDisplays();
   const primary = screen.getPrimaryDisplay();
@@ -574,6 +605,26 @@ ipcMain.handle("is-customer-display-open", () => {
   return !!(customerDisplayWindow && !customerDisplayWindow.isDestroyed());
 });
 
+// Kitchen Display System IPC
+ipcMain.handle("open-kitchen-display", () => {
+  if (!kitchenDisplayWindow || kitchenDisplayWindow.isDestroyed()) {
+    createKitchenDisplayWindow();
+  } else {
+    kitchenDisplayWindow.focus();
+  }
+});
+
+ipcMain.handle("close-kitchen-display", () => {
+  if (kitchenDisplayWindow && !kitchenDisplayWindow.isDestroyed()) {
+    kitchenDisplayWindow.destroy();
+    kitchenDisplayWindow = null;
+  }
+});
+
+ipcMain.handle("is-kitchen-display-open", () => {
+  return !!(kitchenDisplayWindow && !kitchenDisplayWindow.isDestroyed());
+});
+
 ipcMain.handle("open-whatsapp", async (_event, data) => {
   try {
     const url = buildWhatsAppUrl({
@@ -587,5 +638,134 @@ ipcMain.handle("open-whatsapp", async (_event, data) => {
     const msg = err?.message ?? (typeof err === "string" ? err : JSON.stringify(err)) ?? "Error desconocido";
     log.error("open-whatsapp error:", err);
     return { success: false, error: msg };
+  }
+});
+
+ipcMain.handle("whatsapp-share-receipt", async (_event, data) => {
+  try {
+    const { content, phoneNumber } = data;
+    const { printWindow, heightPx } = await createPrintableWindow(content);
+
+    try {
+      // Resize to actual content height so the capture covers the full receipt
+      printWindow.setContentSize(THERMAL_CONTENT_WIDTH_PX, heightPx);
+      await printWindow.webContents.executeJavaScript(
+        "new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))",
+        true,
+      );
+      const image = await printWindow.webContents.capturePage();
+      clipboard.writeImage(image);
+    } finally {
+      destroyWindow(printWindow);
+    }
+
+    const url = buildWhatsAppUrl({ text: "", phoneNumber });
+    await shell.openExternal(url);
+
+    return { success: true };
+  } catch (err) {
+    const msg = err?.message ?? (typeof err === "string" ? err : JSON.stringify(err)) ?? "Error desconocido";
+    log.error("whatsapp-share-receipt error:", err);
+    return { success: false, error: msg };
+  }
+});
+
+// ── Transbank POS IPC ─────────────────────────────────────────────────────────
+
+function getTransbankPOS() {
+  if (!transbankPOS) {
+    try {
+      const { POSIntegrado } = require("transbank-pos-sdk");
+      transbankPOS = new POSIntegrado();
+    } catch (e) {
+      log.error("transbank-pos-sdk load error:", e.message);
+      return null;
+    }
+  }
+  return transbankPOS;
+}
+
+ipcMain.handle("transbank-list-ports", async () => {
+  try {
+    const pos = getTransbankPOS();
+    if (!pos) return { success: false, ports: [], error: "SDK no disponible" };
+    const ports = await pos.listPorts();
+    return { success: true, ports: ports.map((p) => p.path || p) };
+  } catch (e) {
+    log.error("transbank-list-ports error:", e);
+    return { success: false, ports: [], error: e.message };
+  }
+});
+
+ipcMain.handle("transbank-connect", async (_event, port) => {
+  try {
+    const pos = getTransbankPOS();
+    if (!pos) return { success: false, error: "SDK no disponible" };
+    await pos.connect(port);
+    log.info("Transbank POS conectado en", port);
+    return { success: true };
+  } catch (e) {
+    log.error("transbank-connect error:", e);
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle("transbank-disconnect", async () => {
+  try {
+    const pos = getTransbankPOS();
+    if (pos) pos.disconnect();
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle("transbank-get-status", () => {
+  try {
+    const pos = getTransbankPOS();
+    return { connected: pos ? pos.isConnected() : false };
+  } catch {
+    return { connected: false };
+  }
+});
+
+ipcMain.handle("transbank-sale", async (_event, { amount, ticket }) => {
+  try {
+    const pos = getTransbankPOS();
+    if (!pos) return { success: false, error: "SDK no disponible" };
+    if (!pos.isConnected()) return { success: false, error: "PINpad no conectado" };
+
+    const response = await pos.sale(amount, ticket);
+    log.info("Transbank sale response:", JSON.stringify(response));
+
+    if (!response.successful) {
+      const msg = response.responseMessage || `Código ${response.responseCode}`;
+      return { success: false, error: `Transacción rechazada: ${msg}`, responseCode: response.responseCode };
+    }
+
+    return {
+      success: true,
+      authCode: response.authorizationCode ?? "",
+      last4: response.last4Digits != null ? String(response.last4Digits).padStart(4, "0") : "",
+      cardType: response.cardType ?? "",
+      cardBrand: response.cardBrand ?? "",
+      responseCode: response.responseCode,
+    };
+  } catch (e) {
+    log.error("transbank-sale error:", e);
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle("transbank-close-day", async () => {
+  try {
+    const pos = getTransbankPOS();
+    if (!pos) return { success: false, error: "SDK no disponible" };
+    if (!pos.isConnected()) return { success: false, error: "PINpad no conectado" };
+    const response = await pos.closeDay();
+    return { success: true, response };
+  } catch (e) {
+    log.error("transbank-close-day error:", e);
+    return { success: false, error: e.message };
   }
 });

@@ -53,6 +53,7 @@ def create_order(
         seller_id=current_user.id,
         reference=data.reference,
         notes=data.notes,
+        table_id=data.table_id,
         status=OrderStatus.OPEN,
     )
     order.items = _build_items(db, data.items)
@@ -125,6 +126,10 @@ def patch_order(order_id: str, data: OrderPatch, db: Session = Depends(get_db)):
         order.reference = data.reference
     if data.notes is not None:
         order.notes = data.notes
+    if data.table_id is not None:
+        order.table_id = data.table_id
+    if data.bill_requested is not None:
+        order.bill_requested = data.bill_requested
     order.updated_at = datetime.utcnow()
 
     db.commit()

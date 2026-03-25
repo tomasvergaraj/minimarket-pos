@@ -1,0 +1,20 @@
+{
+  "name": "Nexo Admin",
+  "short_name": "Nexo",
+  "description": "Panel de administración MiniMarket POS",
+  "start_url": "/admin/",
+  "scope": "/admin/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f1117",
+  "theme_color": "#4f46e5",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "/admin/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

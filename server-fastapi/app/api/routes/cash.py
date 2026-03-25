@@ -224,14 +224,36 @@ def close_session(
         raise HTTPException(403, "Session belongs to another user")
 
     expected = float(session.opening_amount) + float(session.total_cash_sales or 0)
+    difference = data.closing_amount - expected
     session.closing_amount = data.closing_amount
     session.expected_cash = expected
-    session.difference = data.closing_amount - expected
+    session.difference = difference
     session.status = SessionStatus.CLOSED
     session.closed_at = datetime.utcnow()
 
     db.commit()
     db.refresh(session)
+
+    # Cash difference notification if gap exceeds $2.000
+    try:
+        if abs(difference) >= 2000:
+            from app.services.notification_service import create_notification
+            from app.models.notification import NotificationType
+            sign = "sobrante" if difference > 0 else "faltante"
+            create_notification(
+                db,
+                NotificationType.cash_diff,
+                f"Diferencia de caja: {sign} ${abs(difference):,.0f}",
+                f"Sesión cerrada con {sign} de ${abs(difference):,.0f}. "
+                f"Declarado: ${data.closing_amount:,.0f} — Esperado: ${expected:,.0f}.",
+                entity_id=session.id,
+                entity_type="cash_session",
+                dedup_hours=1,
+            )
+            db.commit()
+    except Exception:
+        pass
+
     return session
 
 

@@ -24,6 +24,7 @@
     "react-dom": "^18.3.1",
     "react-hot-toast": "^2.4.1",
     "react-router-dom": "^6.28.1",
+    "transbank-pos-sdk": "^4.0.0",
     "zustand": "^5.0.2"
   },
   "devDependencies": {
@@ -49,6 +50,11 @@
     "files": [
       "dist/**/*",
       "electron/**/*"
+    ],
+    "asarUnpack": [
+      "**/node_modules/serialport/**/*",
+      "**/node_modules/@serialport/**/*",
+      "**/node_modules/transbank-pos-sdk/**/*"
     ],
     "win": {
       "target": "nsis",

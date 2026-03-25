@@ -21,6 +21,12 @@ class SaleCreate(BaseModel):
     items: list[SaleItemCreate]
     # Optional: IDs of open orders (comandas) to link/close with this sale
     order_ids: list[str] | None = None
+    # Fidelización
+    customer_id: str | None = None
+    points_to_redeem: int = 0
+    # Transbank POS
+    card_auth_code: str | None = None
+    card_last4: str | None = None
 
 
 class SaleItemOut(BaseModel):
@@ -53,6 +59,14 @@ class SaleOut(BaseModel):
     transfer_amount: float = 0
     change_amount: float
     status: str
+    # Fidelización
+    customer_id: str | None = None
+    points_earned: int = 0
+    points_redeemed: int = 0
+    discount_amount: float = 0
+    # Transbank POS
+    card_auth_code: str | None = None
+    card_last4: str | None = None
     # Campos SII (None cuando la integración no está activa)
     sii_tipo_dte: int | None = None
     sii_folio: int | None = None

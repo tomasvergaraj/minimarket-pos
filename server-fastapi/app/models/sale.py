@@ -41,6 +41,16 @@ class Sale(Base):
 
     status: Mapped[SaleStatus] = mapped_column(SAEnum(SaleStatus), default=SaleStatus.COMPLETED)
 
+    # Fidelización
+    customer_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("customers.id", ondelete="SET NULL"), nullable=True)
+    points_earned: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    points_redeemed: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    discount_amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+
+    # Transbank POS (PINpad)
+    card_auth_code: Mapped[str | None] = mapped_column(String(20), nullable=True)   # ej: "123456"
+    card_last4: Mapped[str | None] = mapped_column(String(4), nullable=True)        # últimos 4 dígitos
+
     # SII fields (future boleta electrónica)
     sii_tipo_dte: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 39=boleta
     sii_folio: Mapped[int | None] = mapped_column(Integer, nullable=True)

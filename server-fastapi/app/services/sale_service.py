@@ -1,8 +1,11 @@
 from datetime import datetime
+import math
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+from app.core.config import settings
+from app.models.customer import Customer
 from app.models.product import Product
 from app.models.sale import Sale, SaleItem, PaymentMethod, SaleStatus
 from app.models.cash_register import CashSession
@@ -86,8 +89,27 @@ def create_sale(db: Session, data: SaleCreate) -> tuple[Sale, bytes | None]:
         )
         db.add(kardex)
 
-    subtotal = round(gross_subtotal - tax_total, 2)
-    total = round(gross_subtotal, 2)
+    # ── Loyalty: validate points redemption ──
+    customer: Customer | None = None
+    points_to_redeem = getattr(data, "points_to_redeem", 0) or 0
+    discount_amount = 0.0
+    if data.customer_id:
+        customer = db.query(Customer).filter(Customer.id == data.customer_id, Customer.is_active == True).with_for_update().first()
+        if customer and points_to_redeem > 0:
+            points_to_redeem = min(points_to_redeem, customer.points_balance)
+            discount_amount = round(points_to_redeem * settings.LOYALTY_POINT_VALUE, 2)
+
+    subtotal_before_discount = round(gross_subtotal - tax_total, 2)
+    # Apply loyalty discount proportionally against gross (keep tax math consistent)
+    gross_after_discount = max(0.0, round(gross_subtotal - discount_amount, 2))
+    # Recalculate tax after discount (pro-rata)
+    if gross_subtotal > 0:
+        tax_factor = tax_total / gross_subtotal
+        tax_total = round(gross_after_discount * tax_factor, 2)
+    else:
+        tax_total = 0.0
+    subtotal = round(gross_after_discount - tax_total, 2)
+    total = gross_after_discount
     change = 0.0
 
     payment = PaymentMethod(data.payment_method)
@@ -96,6 +118,11 @@ def create_sale(db: Session, data: SaleCreate) -> tuple[Sale, bytes | None]:
         change = data.cash_amount - total
     elif payment == PaymentMethod.MIXED:
         change = (data.cash_amount + data.card_amount + transfer_amount) - total
+
+    # ── Loyalty: compute points earned on final total ──
+    points_earned = 0
+    if customer:
+        points_earned = math.floor(total / 1000) * settings.LOYALTY_POINTS_PER_THOUSAND
 
     sale = Sale(
         sale_number=max_num + 1,
@@ -111,6 +138,12 @@ def create_sale(db: Session, data: SaleCreate) -> tuple[Sale, bytes | None]:
         transfer_amount=transfer_amount,
         change_amount=max(change, 0),
         status=SaleStatus.COMPLETED,
+        customer_id=data.customer_id if customer else None,
+        points_earned=points_earned,
+        points_redeemed=points_to_redeem,
+        discount_amount=discount_amount,
+        card_auth_code=data.card_auth_code,
+        card_last4=data.card_last4,
     )
     sale.items = sale_items
     db.add(sale)
@@ -127,6 +160,13 @@ def create_sale(db: Session, data: SaleCreate) -> tuple[Sale, bytes | None]:
     db.commit()
     db.refresh(sale)
 
+    # ── Loyalty: update customer balance ──
+    if customer:
+        customer.points_balance = max(0, customer.points_balance + points_earned - points_to_redeem)
+        customer.total_purchases = float(customer.total_purchases or 0) + total
+        customer.visit_count = (customer.visit_count or 0) + 1
+        db.commit()
+
     # Link and close any orders (comandas) associated with this sale
     if data.order_ids:
         for oid in data.order_ids:
@@ -135,6 +175,15 @@ def create_sale(db: Session, data: SaleCreate) -> tuple[Sale, bytes | None]:
                 order.status = OrderStatus.CLOSED
                 order.sale_id = sale.id
         db.commit()
+
+    # ── Stock-low notifications ──
+    try:
+        from app.services.notification_service import check_stock_alerts_for_products
+        sold_stock_ids = list({item.product_id for item in sale_items})
+        check_stock_alerts_for_products(db, sold_stock_ids)
+        db.commit()
+    except Exception:
+        pass  # don't break sale on notification failure
 
     # Emisión DTE (después del commit; sii_status queda en PENDING si OK)
     dte_bytes = emit_boleta(db, sale)

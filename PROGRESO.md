@@ -14,17 +14,17 @@
 | 1.4 | Atajos de teclado en POS | Completado |
 | 1.5 | Resumen visual de turno | Completado |
 | 2.1 | Gestión de Proveedores y OC | Completado |
-| 2.2 | Motor de Promociones | Pendiente |
-| 2.3 | Fidelización de Clientes | Pendiente |
-| 2.4 | Recibos Digitales | Pendiente |
-| 2.5 | Dashboard con Gráficos | Pendiente |
-| 2.6 | Alertas y Notificaciones | Pendiente |
+| 2.2 | Motor de Promociones | Completado |
+| 2.3 | Fidelización de Clientes | Completado |
+| 2.4 | Recibos Digitales | Completado |
+| 2.5 | Dashboard con Gráficos | Completado |
+| 2.6 | Alertas y Notificaciones | Completado |
 | 3.1 | Boleta Electrónica SII | Pendiente |
-| 3.2 | Módulo de Gastos | Pendiente |
-| 3.3 | Mesas/Comandas mejorado | Pendiente |
-| 3.4 | App Móvil / PWA Admin | Pendiente |
-| 3.5 | Sync Cloud / Multi-sucursal | Pendiente |
-| 3.6 | Integración Transbank | Pendiente |
+| 3.2 | Módulo de Gastos | Completado |
+| 3.3 | Mesas/Comandas mejorado | Completado |
+| 3.4 | App Móvil / PWA Admin | Completado |
+| 3.5 | Sync Cloud / Multi-sucursal | Completado |
+| 3.6 | Integración Transbank | Completado |
 
 ---
 
@@ -119,4 +119,176 @@
 
 ---
 
-*Última actualización: 2026-03-24*
+---
+
+### Fase 2.2 — Motor de Promociones
+- **Estado:** Completado
+- **Fecha:** 2026-03-24
+- **Tipos soportados:** percentage_discount, fixed_discount, buy_n_get_m (lleva N paga M), min_quantity (precio especial por volumen)
+- **Archivos nuevos:**
+  - `server-fastapi/app/models/promotion.py` (modelo Promotion con enum PromotionType)
+  - `server-fastapi/app/schemas/promotion.py`
+  - `server-fastapi/app/api/routes/promotions.py` (CRUD admin + endpoint público /active para POS)
+  - `server-fastapi/alembic/versions/0011_add_promotions.py`
+  - `admin-web/src/features/promotions/PromotionsPage.tsx` (tabla con toggle activo/inactivo, crear/editar/eliminar)
+  - `client-electron-pos/src/utils/promotions.ts` (computePromotion, getPromoLabel)
+- **Archivos modificados:**
+  - `server-fastapi/app/models/__init__.py`, `app/main.py` (registro rutas + compat path)
+  - `admin-web/src/App.tsx`, `Sidebar.tsx` (ruta y nav /promotions)
+  - `client-electron-pos/src/types/index.ts` (tipo Promotion)
+  - `client-electron-pos/src/pages/POSPage.tsx` (fetch /promotions/active, applyPromoToItem, handleQuantityChange, badge en carrito)
+  - `client-electron-pos/src/components/CategoryGrid.tsx` (badge PROMO verde cuando aplica promoción)
+- **Notas:** El POS fetcha promociones activas al iniciar. Al agregar o cambiar cantidad, `computePromotion` calcula el precio efectivo y lo aplica via `updatePrice`. Para buy_n_get_m y min_quantity (dependientes de cantidad), el precio se recalcula en cada cambio de qty. La etiqueta de la promo aparece junto al nombre del ítem en el carrito.
+
+---
+
+---
+
+### Fase 2.5 — Dashboard con Gráficos
+- **Estado:** Completado
+- **Fecha:** 2026-03-24
+- **Archivos nuevos:** ninguno
+- **Archivos modificados:**
+  - `server-fastapi/app/schemas/dashboard.py` (añadidos: SalesTrendPoint, HourlyPoint, PaymentMethodPoint, TopProductAnalyticsOut)
+  - `server-fastapi/app/api/routes/dashboard.py` (4 nuevos endpoints analíticos)
+  - `admin-web/src/types/index.ts` (SalesTrendPoint, HourlyPoint, PaymentMethodPoint)
+  - `admin-web/src/lib/services.ts` (fetchSalesTrend, fetchHourlySales, fetchPaymentMethods, fetchTopProductsAnalytics)
+  - `admin-web/src/features/dashboard/DashboardPage.tsx` (reescrito con 4 gráficos recharts)
+- **Notas:**
+  - Backend: 4 endpoints bajo `/dashboard/analytics/` — `sales-trend?days=N`, `hourly?days=N`, `payment-methods?days=N`, `top-products?limit=N&days=N`. Todos requieren admin auth.
+  - Frontend: KPI cards existentes se mantienen. Se agregan 4 gráficos: línea de tendencia de ingresos, barras verticales por hora, donut de métodos de pago, barras horizontales top productos. Selector de rango (7/14/30 días) compartido para tendencia/hora/pagos; selector independiente para top productos.
+  - Se instaló `recharts` en admin-web (`npm install recharts`).
+
+---
+
+### Fase 2.3 — Fidelización de Clientes
+- **Estado:** Completado
+- **Fecha:** 2026-03-24
+- **Archivos nuevos:**
+  - `server-fastapi/app/models/customer.py`
+  - `server-fastapi/app/schemas/customer.py`
+  - `server-fastapi/app/api/routes/customers.py`
+  - `server-fastapi/alembic/versions/0012_add_customers.py`
+  - `server-fastapi/alembic/versions/0013_add_loyalty_to_sales.py`
+  - `admin-web/src/features/customers/CustomersPage.tsx`
+- **Archivos modificados:**
+  - `server-fastapi/app/models/sale.py` (`customer_id`, `points_earned`, `points_redeemed`, `discount_amount`)
+  - `server-fastapi/app/schemas/sale.py` (campos loyalty en SaleCreate y SaleOut)
+  - `server-fastapi/app/services/sale_service.py` (canje de puntos + acumulación post-venta)
+  - `server-fastapi/app/core/config.py` (`LOYALTY_POINTS_PER_THOUSAND`, `LOYALTY_POINT_VALUE`)
+  - `server-fastapi/app/models/__init__.py`, `app/main.py` (registro Customer + ruta)
+  - `admin-web/src/types/index.ts`, `lib/services.ts`, `App.tsx`, `Sidebar.tsx`
+  - `client-electron-pos/src/types/index.ts` (Customer, LoyaltyConfig)
+  - `client-electron-pos/src/components/PaymentModal.tsx` (props loyalty + descuento en UI)
+  - `client-electron-pos/src/pages/POSPage.tsx` (strip de cliente, búsqueda, canje de puntos, total efectivo)
+- **Notas:**
+  - Config por defecto: 1 punto por cada $1.000 gastados; 1 punto = $10 de descuento (ajustable en `.env` con `LOYALTY_POINTS_PER_THOUSAND` / `LOYALTY_POINT_VALUE`).
+  - En el POS: strip encima del carrito para buscar cliente por nombre/RUT/teléfono. Al seleccionar, se muestra balance de puntos y campo para ingresar cuántos canjear. El descuento se descuenta del total en tiempo real.
+  - Al completar la venta, el toast indica `+N pts` ganados. Los puntos del cliente se actualizan automáticamente en BD.
+  - Admin: `/customers` con tabla expandible, historial de compras por cliente, ajuste manual de puntos.
+
+---
+
+### Fase 2.4 — Recibos Digitales
+- **Estado:** Completado
+- **Fecha:** 2026-03-24
+- **Archivos nuevos:**
+  - `server-fastapi/app/services/email_service.py` (HTML receipt builder + SMTP sender)
+- **Archivos modificados:**
+  - `server-fastapi/app/core/config.py` (`SMTP_HOST/PORT/USER/PASSWORD/FROM_NAME/FROM_EMAIL/USE_TLS`, propiedad `smtp_configured`)
+  - `server-fastapi/app/api/routes/sales.py` (`POST /{id}/send-receipt`, BackgroundTask)
+  - `server-fastapi/app/main.py` (`GET /api/config` expone `smtp_configured`)
+  - `admin-web/src/types/index.ts` (`smtp_configured?` en `StoreConfig`)
+  - `admin-web/src/features/config/ConfigPage.tsx` (sección SMTP con estado activo/inactivo)
+  - `client-electron-pos/src/components/ReceiptPreviewModal.tsx` (input email + botón "Email" con llamada a send-receipt)
+- **Notas:**
+  - SMTP se activa configurando `SMTP_HOST`, `SMTP_USER` y `SMTP_PASSWORD` en el `.env` del backend.
+  - El envío se hace en background (BackgroundTasks de FastAPI) para no bloquear la respuesta.
+  - Si SMTP no está configurado, el endpoint retorna HTTP 400 de inmediato.
+  - En el POS, el input de email aparece en el modal de preview de boleta, junto a los botones PDF y WhatsApp.
+  - En el admin, la página de Configuración muestra si el SMTP está activo o no.
+
+---
+
+### Fase 2.6 — Alertas y Notificaciones
+- **Estado:** Completado
+- **Fecha:** 2026-03-24
+- **Archivos nuevos:**
+  - `server-fastapi/app/models/notification.py` (modelo Notification con NotificationType enum)
+  - `server-fastapi/app/schemas/notification.py` (NotificationOut)
+  - `server-fastapi/app/services/notification_service.py` (create con dedup, check_stock_alerts_for_products, run_stock_alerts, run_slow_mover_check, create_daily_summary)
+  - `server-fastapi/app/api/routes/notifications.py` (GET /notifications/, GET /unread-count, POST /{id}/read, POST /read-all)
+  - `server-fastapi/alembic/versions/0014_add_notifications.py`
+- **Archivos modificados:**
+  - `server-fastapi/app/models/__init__.py` (agregar Notification)
+  - `server-fastapi/app/main.py` (lifespan con asyncio task periódica + registro de router)
+  - `server-fastapi/app/services/sale_service.py` (trigger stock-low post-venta)
+  - `server-fastapi/app/api/routes/cash.py` (trigger cash-diff al cerrar sesión con diferencia ≥ $2.000)
+  - `admin-web/src/types/index.ts` (interfaz Notification)
+  - `admin-web/src/lib/services.ts` (fetchNotifications, fetchUnreadCount, markNotificationRead, markAllNotificationsRead)
+  - `admin-web/src/components/layout/TopBar.tsx` (campanita con badge de conteo, panel dropdown con lista de notifs y marca-todo-leído)
+- **Notas:**
+  - Stock bajo: se crea automáticamente al completar una venta si algún producto queda bajo su `min_stock`. Dedup: 1 vez cada 24 h por producto.
+  - Diferencia de caja: se crea al cerrar sesión si la diferencia supera $2.000 (sobrante o faltante).
+  - Productos sin movimiento: check periódico cada ~8 h, productos activos con stock > 0 y sin ventas en 30 días. Dedup: 1 vez por semana por producto.
+  - Resumen diario: se crea vía task periódica ~1 vez cada 23 h con total de ventas del día.
+  - El task periódico corre como coroutine asyncio durante el lifespan de FastAPI (sin dependencias extras).
+  - El panel de la campanita hace polling del conteo cada 60 s y carga la lista completa al abrirse.
+
+---
+
+### Fase 3.5 — Sync Cloud / Multi-sucursal
+- **Estado:** Completado
+- **Fecha:** 2026-03-25
+- **Archivos nuevos:**
+  - `server-fastapi/app/models/sync_log.py` (modelo SyncLog)
+  - `server-fastapi/app/schemas/sync.py` (SyncStatus, SyncConfigOut, SyncLogOut)
+  - `server-fastapi/app/services/cloud_sync_service.py` (lógica de sync: 17 tablas con estrategia incremental/full-upsert/joined)
+  - `server-fastapi/app/api/routes/sync.py` (GET /status, GET /config, PUT /config, POST /trigger)
+  - `server-fastapi/alembic/versions/0017_add_sync_log.py`
+  - `admin-web/src/features/sync/SyncPage.tsx` (estado de sync, historial, config Supabase, guía multi-sucursal)
+- **Archivos modificados:**
+  - `server-fastapi/app/core/config.py` (agregado `BRANCH_ID`)
+  - `server-fastapi/requirements.txt` (agregado `supabase==2.11.0`)
+  - `server-fastapi/app/models/__init__.py` (SyncLog)
+  - `server-fastapi/app/main.py` (router sync)
+  - `sync-worker/sync.py` (reescrito: 17 tablas, branch_id, reporte WhatsApp real, `--once` flag, logs en BD)
+  - `admin-web/src/types/index.ts` (SyncLog, SyncStatus, SyncConfigOut, SyncConfigUpdate)
+  - `admin-web/src/lib/services.ts` (fetchSyncStatus, fetchSyncConfig, updateSyncConfig, triggerSync)
+  - `admin-web/src/App.tsx` (ruta /sync)
+  - `admin-web/src/components/layout/Sidebar.tsx` (ítem "Sync Cloud" con ícono CloudUpload)
+- **Notas:**
+  - 17 tablas sincronizadas con estrategia por tipo: incremental (updated_at/created_at), full-upsert (categorías), joined (sale_items, order_items, purchase_order_items).
+  - Multi-sucursal: cada registro se taguea con `branch_id` (configurable en .env). Supabase almacena datos de todas las sucursales en las mismas tablas.
+  - Sync-worker corre como daemon (cada 30 min) o con `--once` para ejecución única.
+  - Reporte WhatsApp diario (22:00) implementado via WhatsApp Business Cloud API (requiere WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_REPORT_TO en .env).
+  - Trigger manual desde admin web vía `POST /api/sync/trigger` (background task en FastAPI).
+  - Historial de últimas 10 sincronizaciones con duración, estado y errores.
+  - Migración 0017 aplicada: tabla `sync_logs` creada.
+
+---
+
+### Fase 3.6 — Integración Transbank
+- **Estado:** Completado
+- **Fecha:** 2026-03-25
+- **Archivos nuevos:**
+  - `server-fastapi/alembic/versions/0018_add_card_auth_to_sales.py` (columnas `card_auth_code`, `card_last4` en sales)
+- **Archivos modificados:**
+  - `server-fastapi/app/models/sale.py` (`card_auth_code VARCHAR(20)`, `card_last4 VARCHAR(4)`)
+  - `server-fastapi/app/schemas/sale.py` (campos en SaleCreate y SaleOut)
+  - `server-fastapi/app/services/sale_service.py` (pasa card_auth_code y card_last4 al crear la venta)
+  - `client-electron-pos/package.json` (`transbank-pos-sdk@^4.0.0`, `asarUnpack` para serialport)
+  - `client-electron-pos/electron/main.js` (variable `transbankPOS`, helper `getTransbankPOS()`, 6 IPC handlers: list-ports, connect, disconnect, get-status, sale, close-day)
+  - `client-electron-pos/electron/preload.js` (6 métodos Transbank expuestos via contextBridge)
+  - `client-electron-pos/src/vite-env.d.ts` (tipos TypeScript para todos los métodos Transbank en ElectronAPI)
+  - `client-electron-pos/src/pages/SettingsPage.tsx` (sección "Transbank PINpad": selector de puerto COM, conectar/desconectar, estado, cierre del día)
+  - `client-electron-pos/src/components/PaymentModal.tsx` (flujo PINpad en método tarjeta: botón cobrar, estado waiting/approved/failed, auth code + last4 en UI y en el POST de venta)
+- **Notas:**
+  - SDK: `transbank-pos-sdk@4.0.0` con clase `POSIntegrado`. La instancia se crea lazy en el primer uso.
+  - `asarUnpack` es requerido para serialport (módulo nativo) en el build de Electron.
+  - Flujo de pago: al seleccionar "Tarjeta" y tener PINpad conectado, el usuario debe primero procesar el pago en el PINpad. El botón "Confirmar Pago" solo se habilita después del resultado aprobado.
+  - Los campos `card_auth_code` y `card_last4` se guardan en la BD y aparecen en el historial de ventas.
+  - Si el PINpad no está disponible, el método "Tarjeta" sigue funcionando con confirmación manual (compatible hacia atrás).
+  - Migración 0018 debe aplicarse: `alembic upgrade head`.
+
+*Última actualización: 2026-03-25*

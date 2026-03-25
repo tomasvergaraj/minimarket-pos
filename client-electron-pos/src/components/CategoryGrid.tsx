@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect } from "react";
 import { Grid2X2, Loader2 } from "lucide-react";
 import api from "@/services/api";
-import type { CartItem, Product } from "@/types";
+import type { CartItem, Product, Promotion } from "@/types";
 import { formatCLP } from "@/utils/format";
+import { getPromoLabel } from "@/utils/promotions";
 
 interface Category {
   id: string;
@@ -13,11 +14,12 @@ interface Category {
 interface Props {
   onProductClick: (product: Product) => void;
   cartItems: CartItem[];
+  promotions?: Promotion[];
 }
 
 const SERVER_URL = localStorage.getItem("server_url") || "http://localhost:8001";
 
-export default function CategoryGrid({ onProductClick, cartItems }: Props) {
+export default function CategoryGrid({ onProductClick, cartItems, promotions = [] }: Props) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -148,12 +150,25 @@ export default function CategoryGrid({ onProductClick, cartItems }: Props) {
                       )}
                     </div>
 
-                    {/* Offer badge */}
-                    {product.is_on_offer && (
-                      <span className="absolute top-1 right-1 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-                        OFERTA
-                      </span>
-                    )}
+                    {/* Offer / Promo badge */}
+                    {(() => {
+                      const promoLabel = getPromoLabel(product, promotions);
+                      if (promoLabel) {
+                        return (
+                          <span className="absolute top-1 right-1 bg-green-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                            PROMO
+                          </span>
+                        );
+                      }
+                      if (product.is_on_offer) {
+                        return (
+                          <span className="absolute top-1 right-1 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                            OFERTA
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
                     {product.is_pack && (
                       <span className="absolute top-1 left-1 bg-purple-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">
                         x{product.units_contained}

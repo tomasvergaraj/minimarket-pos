@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Sale } from "@/types";
-import { Download, MessageCircle, Printer, Settings, X } from "lucide-react";
+import { Download, Mail, MessageCircle, Printer, Settings, X } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   buildReceiptContent,
   buildReceiptHtml,
   buildReceiptPdfFileName,
-  buildReceiptWhatsAppText,
 } from "@/services/printer";
 import { getSavedPrinterName } from "@/pages/SettingsPage";
 import { useNavigate } from "react-router-dom";
+import api from "@/services/api";
 
 interface Props {
   sale: Sale;
@@ -23,6 +23,8 @@ export default function ReceiptPreviewModal({ sale, onClose, sellerName, registe
   const printerName = getSavedPrinterName();
   const [savingPdf, setSavingPdf] = useState(false);
   const [openingWhatsApp, setOpeningWhatsApp] = useState(false);
+  const [emailInput, setEmailInput] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
   const hasDesktopApi = !!window.electronAPI;
   const canPrint = !!window.electronAPI && !!printerName;
 
@@ -90,21 +92,32 @@ export default function ReceiptPreviewModal({ sale, onClose, sellerName, registe
 
     setOpeningWhatsApp(true);
     try {
-      const text = buildReceiptWhatsAppText(sale, {
-        registerName,
-        sellerName,
-      });
-      const result = await window.electronAPI.openWhatsApp({ text });
+      const content = buildReceiptContent(sale, { registerName, sellerName });
+      const result = await window.electronAPI.whatsappShareReceipt({ content });
 
       if (result.success) {
-        toast.success("WhatsApp abierto");
+        toast.success("Boleta copiada al portapapeles — pégala en WhatsApp con Ctrl+V", { duration: 5000 });
       } else {
-        toast.error(`Error abriendo WhatsApp: ${result.error}`);
+        toast.error(`Error: ${result.error}`);
       }
     } finally {
       setOpeningWhatsApp(false);
     }
   }, [registerName, sale, sellerName]);
+
+  const handleSendEmail = useCallback(async () => {
+    if (!emailInput.trim()) return;
+    setSendingEmail(true);
+    try {
+      await api.post(`/sales/${sale.id}/send-receipt`, { email: emailInput.trim() });
+      toast.success(`Recibo enviado a ${emailInput.trim()}`);
+      setEmailInput("");
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Error al enviar el recibo");
+    } finally {
+      setSendingEmail(false);
+    }
+  }, [emailInput, sale.id]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -168,6 +181,25 @@ export default function ReceiptPreviewModal({ sale, onClose, sellerName, registe
             >
               <MessageCircle size={14} />
               {openingWhatsApp ? "Abriendo..." : "WhatsApp"}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 w-full max-w-xs">
+            <input
+              type="email"
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); void handleSendEmail(); } }}
+              placeholder="correo@ejemplo.com"
+              className="flex-1 px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-white text-xs placeholder:text-white/40 focus:outline-none focus:border-white/50"
+            />
+            <button
+              onClick={() => void handleSendEmail()}
+              disabled={!emailInput.trim() || sendingEmail}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-medium transition"
+            >
+              <Mail size={13} />
+              {sendingEmail ? "Enviando..." : "Email"}
             </button>
           </div>
 

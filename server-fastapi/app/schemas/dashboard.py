@@ -24,3 +24,30 @@ class DashboardStatsResponse(BaseModel):
     success: bool = True
     data: DashboardStatsOut
     error: ApiError | None = None
+
+
+# ── Analytics schemas ──
+
+class SalesTrendPoint(BaseModel):
+    date: str          # "YYYY-MM-DD"
+    total: float
+    count: int
+
+
+class HourlyPoint(BaseModel):
+    hour: int          # 0–23
+    total: float
+    count: int
+
+
+class PaymentMethodPoint(BaseModel):
+    method: str        # "cash" | "card" | "transfer"
+    total: float
+    count: int
+
+
+class TopProductAnalyticsOut(BaseModel):
+    product_id: str
+    product_name: str
+    quantity_sold: int
+    revenue: float

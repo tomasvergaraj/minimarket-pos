@@ -246,10 +246,128 @@ export interface DashboardStats {
   top_5_productos: TopProduct[]
 }
 
+export interface SalesTrendPoint {
+  date: string   // "YYYY-MM-DD"
+  total: number
+  count: number
+}
+
+export interface HourlyPoint {
+  hour: number   // 0–23
+  total: number
+  count: number
+}
+
+export interface PaymentMethodPoint {
+  method: string   // "cash" | "card" | "transfer"
+  total: number
+  count: number
+}
+
 export interface StoreConfig {
   store_name: string
   store_rut: string
   store_address: string
+  smtp_configured?: boolean
+}
+
+// ── Expenses ──
+export interface Expense {
+  id: string
+  amount: number
+  category: string
+  description: string
+  notes: string | null
+  expense_date: string
+  created_by_id: string | null
+  created_at: string
+}
+
+export interface ExpenseCreate {
+  amount: number
+  category: string
+  description: string
+  notes?: string
+  expense_date: string
+}
+
+export interface ExpenseUpdate {
+  amount?: number
+  category?: string
+  description?: string
+  notes?: string
+  expense_date?: string
+}
+
+export interface ExpenseCategoryTotal {
+  category: string
+  label: string
+  total: number
+}
+
+export interface ExpenseSummary {
+  date_from: string
+  date_to: string
+  total_sales: number
+  total_cogs: number
+  gross_profit: number
+  total_expenses: number
+  net_profit: number
+  by_category: ExpenseCategoryTotal[]
+}
+
+// ── Notifications ──
+export interface Notification {
+  id: string
+  type: 'stock_low' | 'cash_diff' | 'slow_mover' | 'daily_summary'
+  title: string
+  body: string
+  is_read: boolean
+  entity_id: string | null
+  entity_type: string | null
+  created_at: string
+}
+
+// ── Tables ──
+
+export interface Table {
+  id: string
+  name: string
+  capacity: number
+  pos_x: number
+  pos_y: number
+  is_active: boolean
+  created_at: string
+}
+
+export interface TableCreate {
+  name: string
+  capacity: number
+  pos_x: number
+  pos_y: number
+}
+
+export interface TableUpdate {
+  name?: string
+  capacity?: number
+  pos_x?: number
+  pos_y?: number
+  is_active?: boolean
+}
+
+export interface TableStatus {
+  id: string
+  name: string
+  capacity: number
+  pos_x: number
+  pos_y: number
+  is_active: boolean
+  status: 'free' | 'occupied' | 'bill_requested'
+  order_id: string | null
+  order_number: number | null
+  order_total: number | null
+  opened_at: string | null
+  item_count: number
 }
 
 // ── Suppliers ──
@@ -346,4 +464,76 @@ export interface ReceiveItemInput {
 
 export interface ReceivePurchaseOrderInput {
   items: ReceiveItemInput[]
+}
+
+// ── Customers / Loyalty ──
+
+export interface Customer {
+  id: string
+  name: string
+  rut: string | null
+  phone: string | null
+  email: string | null
+  notes: string | null
+  points_balance: number
+  total_purchases: number
+  visit_count: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CustomerCreate {
+  name: string
+  rut?: string | null
+  phone?: string | null
+  email?: string | null
+  notes?: string | null
+}
+
+export interface CustomerUpdate {
+  name?: string
+  rut?: string | null
+  phone?: string | null
+  email?: string | null
+  notes?: string | null
+  is_active?: boolean
+}
+
+export interface LoyaltyConfig {
+  points_per_thousand: number
+  point_value: number
+}
+
+// ── Cloud Sync ──
+
+export interface SyncLog {
+  id: number
+  branch_id: string
+  started_at: string
+  completed_at: string | null
+  status: 'running' | 'success' | 'error' | 'skipped'
+  tables_synced: number
+  records_synced: number
+  error_message: string | null
+}
+
+export interface SyncStatus {
+  configured: boolean
+  branch_id: string
+  last_sync: SyncLog | null
+  recent_logs: SyncLog[]
+}
+
+export interface SyncConfigOut {
+  supabase_url: string
+  supabase_key_masked: string
+  branch_id: string
+  sync_enabled: boolean
+}
+
+export interface SyncConfigUpdate {
+  supabase_url: string
+  supabase_key: string
+  branch_id: string
 }

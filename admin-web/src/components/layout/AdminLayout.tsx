@@ -11,8 +11,12 @@ export default function AdminLayout() {
   const { user } = useAuth()
   const { blockingLicense } = useLicense()
   const [collapsed, setCollapsed] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
+
+  // Close mobile drawer on navigation
+  useEffect(() => { setMobileOpen(false) }, [location.pathname])
 
   useEffect(() => {
     if (!user || !blockingLicense || location.pathname === '/config') return
@@ -23,10 +27,23 @@ export default function AdminLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface">
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 md:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      <Sidebar
+        collapsed={collapsed}
+        onToggle={() => setCollapsed((c) => !c)}
+        mobileOpen={mobileOpen}
+        onMobileClose={() => setMobileOpen(false)}
+      />
 
       <div className="flex-1 flex flex-col min-w-0">
-        <TopBar />
+        <TopBar onMenuClick={() => setMobileOpen((o) => !o)} />
 
         {blockingLicense && (
           <div className="border-b border-amber-200 bg-amber-50/95">

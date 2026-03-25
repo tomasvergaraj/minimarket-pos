@@ -13,6 +13,11 @@ import {
   ChevronsRight,
   Truck,
   ShoppingCart,
+  Percent,
+  UserCheck,
+  TrendingDown,
+  LayoutGrid,
+  CloudUpload,
 } from 'lucide-react'
 import clsx from 'clsx'
 import nexoIconUrl from '../../assets/nexo-icon.svg'
@@ -29,6 +34,11 @@ const iconMap = {
   Settings,
   Truck,
   ShoppingCart,
+  Percent,
+  UserCheck,
+  TrendingDown,
+  LayoutGrid,
+  CloudUpload,
 } as const
 
 const navItems = [
@@ -42,20 +52,36 @@ const navItems = [
   { path: '/reports', label: 'Reportes', icon: 'FileSpreadsheet' as const },
   { path: '/suppliers', label: 'Proveedores', icon: 'Truck' as const },
   { path: '/purchases', label: 'Compras', icon: 'ShoppingCart' as const },
+  { path: '/promotions', label: 'Promociones', icon: 'Percent' as const },
+  { path: '/customers', label: 'Clientes', icon: 'UserCheck' as const },
+  { path: '/tables', label: 'Mesas', icon: 'LayoutGrid' as const },
+  { path: '/expenses', label: 'Gastos', icon: 'TrendingDown' as const },
+  { path: '/sync', label: 'Sync Cloud', icon: 'CloudUpload' as const },
   { path: '/config', label: 'Configuración', icon: 'Settings' as const },
 ]
 
 interface SidebarProps {
   collapsed: boolean
   onToggle: () => void
+  mobileOpen?: boolean
+  onMobileClose?: () => void
 }
 
-export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export default function Sidebar({ collapsed, onToggle, mobileOpen = false, onMobileClose }: SidebarProps) {
   return (
     <aside
       className={clsx(
-        'bg-surface-sidebar h-screen flex flex-col shrink-0 transition-[width] duration-200 ease-out',
-        collapsed ? 'w-15' : 'w-55'
+        'bg-surface-sidebar h-screen flex flex-col shrink-0',
+        // Mobile: fixed drawer, slides in/out
+        'fixed inset-y-0 left-0 z-50',
+        'md:relative md:z-auto md:translate-x-0',
+        mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+        'transition-transform duration-200 ease-out',
+        // Desktop width transition
+        'md:transition-[width,transform]',
+        // Width: always 64 on mobile, collapsed/expanded on desktop
+        'w-64 md:w-55',
+        collapsed && 'md:w-15',
       )}
     >
       {/* Brand */}
@@ -107,12 +133,22 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         })}
       </nav>
 
-      {/* Collapse toggle */}
+      {/* Collapse toggle (desktop only) / Close button (mobile only) */}
       <div className="px-2 py-3 border-t border-white/6">
+        {/* Mobile close */}
+        <button
+          onClick={onMobileClose}
+          className="md:hidden w-full flex items-center gap-2 px-3 rounded-md py-2 text-[12px] text-gray-500 hover:text-gray-300 hover:bg-white/4 transition-colors"
+          aria-label="Cerrar menú"
+        >
+          <ChevronsLeft className="w-4 h-4" />
+          <span>Cerrar menú</span>
+        </button>
+        {/* Desktop collapse */}
         <button
           onClick={onToggle}
           className={clsx(
-            'w-full flex items-center gap-2 rounded-md py-2 text-[12px] text-gray-500 hover:text-gray-300 hover:bg-white/4 transition-colors duration-(--duration-fast)',
+            'hidden md:flex w-full items-center gap-2 rounded-md py-2 text-[12px] text-gray-500 hover:text-gray-300 hover:bg-white/4 transition-colors duration-(--duration-fast)',
             collapsed ? 'justify-center px-0' : 'px-3'
           )}
           aria-label={collapsed ? 'Expandir menú' : 'Colapsar menú'}

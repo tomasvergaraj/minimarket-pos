@@ -391,7 +391,7 @@ export default function ExpensesPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-border rounded-xl overflow-hidden">
+      <div className="bg-white border border-border rounded-xl overflow-hidden overflow-x-auto">
         {loading ? (
           <TableSkeleton rows={6} />
         ) : expenses.length === 0 ? (

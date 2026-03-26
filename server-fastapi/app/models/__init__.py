@@ -15,6 +15,7 @@ from app.models.expense import Expense
 from app.models.table import Table
 from app.models.sync_log import SyncLog
 from app.models.audit_log import AuditLog
+from app.models.refresh_token import RefreshToken
 
 __all__ = [
     "Product", "Sale", "SaleItem",
@@ -32,4 +33,5 @@ __all__ = [
     "Table",
     "SyncLog",
     "AuditLog",
+    "RefreshToken",
 ]

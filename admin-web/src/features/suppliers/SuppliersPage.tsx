@@ -73,7 +73,7 @@ function SupplierFormModal({
       size="md"
     >
       <form onSubmit={handleSubmit} className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="col-span-2">
             <Input label="Nombre *" value={form.name} onChange={set('name')} required autoFocus placeholder="Ej: Distribuidora Norte S.A." />
           </div>

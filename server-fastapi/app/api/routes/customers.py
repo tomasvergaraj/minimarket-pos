@@ -83,7 +83,7 @@ def create_customer(data: CustomerCreate, db: Session = Depends(get_db)):
 
 @router.get("/{customer_id}", response_model=CustomerOut, dependencies=[Depends(require_admin)])
 def get_customer(customer_id: str, db: Session = Depends(get_db)):
-    customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    customer = db.query(Customer).filter(Customer.id == customer_id, Customer.is_active == True).first()
     if not customer:
         raise HTTPException(404, "Cliente no encontrado")
     return customer
@@ -124,7 +124,7 @@ def get_customer_history(
     limit: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    customer = db.query(Customer).filter(Customer.id == customer_id, Customer.is_active == True).first()
     if not customer:
         raise HTTPException(404, "Cliente no encontrado")
     return (

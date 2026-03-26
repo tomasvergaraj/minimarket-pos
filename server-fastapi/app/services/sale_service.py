@@ -196,6 +196,8 @@ def void_sale(db: Session, sale_id: str) -> Sale:
     sale = db.query(Sale).filter(Sale.id == sale_id).first()
     if not sale:
         raise ValueError("Sale not found")
+    if sale.status == SaleStatus.VOIDED:
+        raise ValueError("La venta ya fue anulada")
 
     sale.status = SaleStatus.VOIDED
 

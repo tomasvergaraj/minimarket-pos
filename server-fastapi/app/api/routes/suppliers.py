@@ -41,7 +41,7 @@ def get_supplier(
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
-    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+    supplier = db.query(Supplier).filter(Supplier.id == supplier_id, Supplier.is_active == True).first()
     if not supplier:
         raise HTTPException(404, "Proveedor no encontrado")
     return supplier

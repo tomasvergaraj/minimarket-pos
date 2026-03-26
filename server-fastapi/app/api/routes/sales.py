@@ -1,6 +1,9 @@
 from datetime import date, datetime, time, timedelta
 
+import io
+
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_admin, require_operational_license
@@ -45,6 +48,23 @@ def get_sale_by_number(sale_number: int, db: Session = Depends(get_db)):
     if not sale:
         raise HTTPException(404, "Sale not found")
     return sale
+
+
+@router.get("/{sale_id}/receipt.pdf", dependencies=[Depends(get_current_user)])
+def get_receipt_pdf(sale_id: str, db: Session = Depends(get_db)):
+    sale = db.query(Sale).filter(Sale.id == sale_id).first()
+    if not sale:
+        raise HTTPException(404, "Sale not found")
+    try:
+        from app.services.pdf_service import generate_receipt_pdf
+        pdf_bytes = generate_receipt_pdf(sale)
+    except Exception as exc:
+        raise HTTPException(500, f"Error al generar PDF: {exc}")
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="boleta-{sale.sale_number}.pdf"'},
+    )
 
 
 @router.get("/{sale_id}", response_model=SaleOut, dependencies=[Depends(get_current_user)])

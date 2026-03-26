@@ -29,6 +29,7 @@ class PinLogin(BaseModel):
 
 class AuthSession(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: Literal["bearer"] = "bearer"
     expires_in: int
     user: UserOut
@@ -37,6 +38,23 @@ class AuthSession(BaseModel):
 class AuthSessionResponse(BaseModel):
     success: bool = True
     data: AuthSession
+    error: ApiError | None = None
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class TokenRefreshOut(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: Literal["bearer"] = "bearer"
+    expires_in: int
+
+
+class TokenRefreshResponse(BaseModel):
+    success: bool = True
+    data: TokenRefreshOut
     error: ApiError | None = None
 
 

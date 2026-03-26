@@ -189,7 +189,7 @@ function CreatePurchaseModal({
 
         {/* Items table */}
         {items.length > 0 && (
-          <div className="border border-border rounded-lg overflow-hidden">
+          <div className="border border-border rounded-lg overflow-hidden overflow-x-auto">
             <table className="w-full text-[13px]">
               <thead className="bg-gray-50 text-text-secondary">
                 <tr>
@@ -314,7 +314,7 @@ function ReceiveModal({
           Confirma las cantidades recibidas. El stock se actualizará automáticamente.
         </p>
 
-        <div className="border border-border rounded-lg overflow-hidden">
+        <div className="border border-border rounded-lg overflow-hidden overflow-x-auto">
           <table className="w-full text-[13px]">
             <thead className="bg-gray-50 text-text-secondary">
               <tr>
@@ -559,7 +559,7 @@ export default function PurchasesPage() {
       )}
 
       {orders.length > 0 && (
-        <div className="bg-white border border-border rounded-xl overflow-hidden">
+        <div className="bg-white border border-border rounded-xl overflow-hidden overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 text-text-secondary text-[12px]">
               <tr>

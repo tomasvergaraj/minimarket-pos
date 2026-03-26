@@ -67,9 +67,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(() => {
+    const current = getStoredAdminSession()
     clearStoredAdminSession()
     setSession(null)
     setError(null)
+    // Best-effort server-side revocation — don't block the UI
+    if (current?.refresh_token) {
+      import('../lib/services').then(({ logoutSession }) => {
+        logoutSession(current.refresh_token).catch(() => {/* ignore */})
+      })
+    }
   }, [])
 
   return (

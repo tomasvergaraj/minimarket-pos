@@ -384,7 +384,7 @@ export default function PromotionsPage() {
       )}
 
       {promotions.length > 0 && (
-        <div className="bg-white border border-border rounded-xl overflow-hidden">
+        <div className="bg-white border border-border rounded-xl overflow-hidden overflow-x-auto">
           <table className="w-full text-[13px]">
             <thead className="bg-gray-50 text-text-secondary text-[12px]">
               <tr>

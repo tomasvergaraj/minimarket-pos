@@ -45,6 +45,15 @@ JOINED_PARENT: dict[str, tuple[str, str, str]] = {
     "order_items":           ("orders",          "order_id",          "updated_at"),
 }
 
+# Columns present locally but NOT in the remote Supabase schema.
+# Add any column here to prevent PGRST204 "Could not find column" errors
+# when the remote schema is behind the local one.
+# Only exclude columns that were added AFTER the Supabase schema was last updated.
+COLUMNS_EXCLUDE: dict[str, set[str]] = {
+    # card_auth_code / card_last4 added in migration 0018 — not yet in Supabase
+    "sales": {"card_auth_code", "card_last4"},
+}
+
 
 def _serialize(row: dict) -> dict:
     out = {}
@@ -114,7 +123,12 @@ def run_sync(db: Session) -> dict[str, Any]:
             try:
                 rows = _fetch_rows(conn, table, time_col, since)
                 if rows:
-                    tagged = [{**_serialize(r), "branch_id": branch_id} for r in rows]
+                    exclude = COLUMNS_EXCLUDE.get(table, set())
+                    tagged = [
+                        {k: v for k, v in {**_serialize(r), "branch_id": branch_id}.items()
+                         if k not in exclude}
+                        for r in rows
+                    ]
                     # Upsert — Supabase requires the conflict columns to exist in the table.
                     # branch_id must be a column in every Supabase table for multi-sucursal.
                     supabase.table(table).upsert(tagged).execute()
@@ -123,7 +137,7 @@ def run_sync(db: Session) -> dict[str, Any]:
                 tables_synced += 1
             except Exception as e:
                 logger.error(f"Error syncing {table}: {e}")
-                errors.append(f"{table}: {str(e)[:120]}")
+                errors.append(f"{table}: {str(e)[:400]}")
 
     return {
         "status": "success" if not errors else "error",

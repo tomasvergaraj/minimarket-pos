@@ -404,6 +404,7 @@ export async function loginWithPin(pin: string): Promise<AuthSession> {
     if (!user) throw new Error('PIN incorrecto')
     return {
       access_token: 'mock-token',
+      refresh_token: 'mock-refresh-token',
       token_type: 'bearer',
       expires_in: 60 * 60,
       user,
@@ -751,6 +752,10 @@ export async function updateSyncConfig(data: { supabase_url: string; supabase_ke
 export async function triggerSync(): Promise<{ message: string; log_id: number }> {
   const res = await api.post('/sync/trigger')
   return res.data
+}
+
+export async function logoutSession(refreshToken: string): Promise<void> {
+  await api.post('/users/logout', { refresh_token: refreshToken })
 }
 
 export async function fetchAuditLogs(params?: {

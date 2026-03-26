@@ -69,7 +69,7 @@ export default function AdminLayout() {
         )}
 
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-7xl mx-auto px-6 py-5 animate-fade-in">
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-5 animate-fade-in">
             <Outlet />
           </div>
         </main>

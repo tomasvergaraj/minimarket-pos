@@ -73,7 +73,7 @@ def get_by_barcode(barcode: str, db: Session = Depends(get_db)):
     dependencies=[Depends(get_current_user), Depends(require_operational_license)],
 )
 def get_product(product_id: str, db: Session = Depends(get_db)):
-    product = db.query(Product).filter(Product.id == product_id).first()
+    product = db.query(Product).filter(Product.id == product_id, Product.is_active == True).first()
     if not product:
         raise HTTPException(404, "Product not found")
     return _to_out(product, db)

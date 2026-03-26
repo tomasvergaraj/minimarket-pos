@@ -297,7 +297,7 @@ export default function CustomersPage() {
       </form>
 
       {/* Table */}
-      <div className="bg-surface-card rounded-xl border border-border overflow-hidden">
+      <div className="bg-surface-card rounded-xl border border-border overflow-hidden overflow-x-auto">
         {loading ? (
           <TableSkeleton rows={6} cols={6} />
         ) : (

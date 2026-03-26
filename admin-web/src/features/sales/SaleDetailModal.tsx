@@ -1,8 +1,11 @@
+import { useState } from 'react'
+import { Download } from 'lucide-react'
 import Modal from '../../components/ui/Modal'
 import Badge from '../../components/ui/Badge'
 import type { Sale } from '../../types'
 import { formatCLP, formatDateTime } from '../../lib/format'
 import { PAYMENT_METHOD_LABELS, SALE_STATUS_LABELS } from '../../lib/constants'
+import { getServerUrl, getStoredAdminSession } from '../../lib/api'
 
 interface SaleDetailModalProps {
   open: boolean
@@ -11,8 +14,30 @@ interface SaleDetailModalProps {
 }
 
 export default function SaleDetailModal({ open, onClose, sale }: SaleDetailModalProps) {
+  const [downloading, setDownloading] = useState(false)
+
   if (!sale) return null
   const netSubtotal = Math.max(sale.total - sale.tax_amount, 0)
+
+  const handleDownloadPdf = async () => {
+    setDownloading(true)
+    try {
+      const session = getStoredAdminSession()
+      const res = await fetch(`${getServerUrl()}/api/sales/${sale.id}/receipt.pdf`, {
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+      })
+      if (!res.ok) throw new Error('Error al descargar')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `boleta-${sale.sale_number}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   return (
     <Modal open={open} onClose={onClose} title={`Venta #${sale.sale_number}`} size="lg">
@@ -113,6 +138,18 @@ export default function SaleDetailModal({ open, onClose, sale }: SaleDetailModal
               <span className="tabular-nums">{formatCLP(sale.change_amount)}</span>
             </div>
           )}
+        </div>
+
+        {/* Actions */}
+        <div className="pt-2 flex justify-end">
+          <button
+            onClick={handleDownloadPdf}
+            disabled={downloading}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium rounded-lg border border-border text-text-secondary hover:bg-surface-hover transition disabled:opacity-50"
+          >
+            <Download className="w-3.5 h-3.5" />
+            {downloading ? 'Descargando...' : 'Descargar PDF'}
+          </button>
         </div>
       </div>
     </Modal>

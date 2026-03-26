@@ -105,24 +105,82 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+// Refresh token machinery
+let _isRefreshing = false
+let _refreshQueue: Array<(token: string) => void> = []
+
+function _redirectToLogin() {
+  clearStoredAdminSession()
+  const loginPath = resolveAdminPath('/login')
+  if (typeof window !== 'undefined' && window.location.pathname !== loginPath) {
+    window.location.href = loginPath
+  }
+}
+
 // Handle API errors globally.
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (!error.response) {
       return Promise.reject(new Error('No se pudo conectar al servidor'))
     }
 
     const status = error.response.status
     const detail = error.response.data?.detail
+    const original = error.config as typeof error.config & { _retry?: boolean }
 
     if (status === 401) {
-      const msg = typeof detail === 'object' ? detail.message : 'Sesión expirada'
-      const loginPath = resolveAdminPath('/login')
-      clearStoredAdminSession()
-      if (window.location.pathname !== loginPath) {
-        window.location.href = loginPath
+      // If it's the refresh endpoint itself that 401'd, bail out entirely
+      if (original?.url?.includes('/users/refresh') || original?.url?.includes('/users/logout')) {
+        _redirectToLogin()
+        return Promise.reject(new Error('Sesión expirada'))
       }
+
+      const session = getStoredAdminSession()
+      if (!original._retry && session?.refresh_token) {
+        if (_isRefreshing) {
+          // Queue until refresh resolves
+          return new Promise((resolve, _reject) => {
+            _refreshQueue.push((newToken) => {
+              original.headers = original.headers ?? {}
+              original.headers.Authorization = `Bearer ${newToken}`
+              resolve(api(original))
+            })
+          })
+        }
+
+        original._retry = true
+        _isRefreshing = true
+
+        try {
+          const { data } = await api.post('/users/refresh', { refresh_token: session.refresh_token })
+          const refreshData = data.data as { access_token: string; refresh_token: string; expires_in: number }
+
+          const updated = {
+            ...session,
+            access_token: refreshData.access_token,
+            refresh_token: refreshData.refresh_token,
+            expires_at: new Date(Date.now() + refreshData.expires_in * 1000).toISOString(),
+          }
+          setStoredAdminSession(updated)
+
+          _refreshQueue.forEach((cb) => cb(refreshData.access_token))
+          _refreshQueue = []
+
+          original.headers = original.headers ?? {}
+          original.headers.Authorization = `Bearer ${refreshData.access_token}`
+          return api(original)
+        } catch {
+          _redirectToLogin()
+          _refreshQueue = []
+          return Promise.reject(new Error('Sesión expirada'))
+        } finally {
+          _isRefreshing = false
+        }
+      }
+
+      _redirectToLogin()
+      const msg = typeof detail === 'object' ? detail.message : 'Sesión expirada'
       return Promise.reject(new Error(msg))
     }
 

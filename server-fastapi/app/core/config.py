@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     SERVER_PORT: int = 8001
     SECRET_KEY: str = "change-me-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     LICENSE_TRIAL_DAYS: int = 30
     LICENSE_CLOCK_SKEW_MINUTES: int = 90
     LICENSE_PUBLIC_KEY_PATH: str = ""

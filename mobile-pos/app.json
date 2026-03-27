@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Nexo POS",
+    "slug": "mobile-pos",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "nexopos",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1e40af"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nexo.pos"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1e40af",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "com.nexo.pos",
+      "predictiveBackGestureEnabled": false,
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-barcode-scanner",
+      "expo-sharing",
+      [
+        "expo-camera",
+        { "cameraPermission": "Requerido para escanear códigos de barras" }
+      ]
+    ]
+  }
+}

@@ -18,48 +18,50 @@ export function PinPad({ pin, onDigit, onDelete, onSubmit, maxLength = 6, loadin
   return (
     <View style={tw`w-full`}>
       {/* Display PIN (asteriscos + placeholders) — igual al desktop */}
-      <View style={tw`bg-gray-100 rounded-lg p-4 mb-5 items-center`}>
-        <Text style={tw`text-3xl tracking-widest font-mono text-gray-800`}>
+      <View style={tw`bg-gray-100 rounded-2xl px-5 py-5 mb-6 items-center`}>
+        <Text style={[tw`tracking-widest font-mono text-gray-800`, { fontSize: 34, lineHeight: 42 }]}>
           {'*'.repeat(pin.length)}
-          <Text style={tw`text-gray-300`}>{'_'.repeat(Math.max(0, maxLength - pin.length))}</Text>
+          <Text style={[tw`text-gray-300`, { fontSize: 34, lineHeight: 42 }]}>
+            {'_'.repeat(Math.max(0, maxLength - pin.length))}
+          </Text>
         </Text>
       </View>
 
       {/* Grid 3×3: dígitos 1–9 */}
-      <View style={tw`gap-3`}>
+      <View style={tw`gap-4`}>
         {[[1,2,3],[4,5,6],[7,8,9]].map((row, ri) => (
-          <View key={ri} style={tw`flex-row gap-3`}>
+          <View key={ri} style={tw`flex-row gap-4`}>
             {row.map((d) => (
               <TouchableOpacity
                 key={d}
                 onPress={() => onDigit(String(d))}
                 disabled={loading}
-                style={tw`flex-1 bg-gray-100 py-4 rounded-lg items-center`}
+                style={[tw`flex-1 bg-gray-100 rounded-2xl items-center justify-center`, { minHeight: 72 }]}
               >
-                <Text style={tw`text-xl font-semibold text-gray-800`}>{d}</Text>
+                <Text style={[tw`font-semibold text-gray-800`, { fontSize: 28, lineHeight: 32 }]}>{d}</Text>
               </TouchableOpacity>
             ))}
           </View>
         ))}
 
         {/* Última fila: C / 0 / OK */}
-        <View style={tw`flex-row gap-3`}>
+        <View style={tw`flex-row gap-4`}>
           {/* C — limpiar todo */}
           <TouchableOpacity
             onPress={onDelete}
             disabled={loading}
-            style={tw`flex-1 bg-red-100 py-4 rounded-lg items-center`}
+            style={[tw`flex-1 bg-red-100 rounded-2xl items-center justify-center`, { minHeight: 72 }]}
           >
-            <Text style={tw`text-xl font-semibold text-red-600`}>⌫</Text>
+            <Text style={[tw`font-semibold text-red-600`, { fontSize: 26, lineHeight: 30 }]}>⌫</Text>
           </TouchableOpacity>
 
           {/* 0 */}
           <TouchableOpacity
             onPress={() => onDigit('0')}
             disabled={loading}
-            style={tw`flex-1 bg-gray-100 py-4 rounded-lg items-center`}
+            style={[tw`flex-1 bg-gray-100 rounded-2xl items-center justify-center`, { minHeight: 72 }]}
           >
-            <Text style={tw`text-xl font-semibold text-gray-800`}>0</Text>
+            <Text style={[tw`font-semibold text-gray-800`, { fontSize: 28, lineHeight: 32 }]}>0</Text>
           </TouchableOpacity>
 
           {/* OK */}
@@ -67,12 +69,14 @@ export function PinPad({ pin, onDigit, onDelete, onSubmit, maxLength = 6, loadin
             onPress={onSubmit}
             disabled={loading || pin.length === 0}
             style={[
-              tw`flex-1 py-4 rounded-lg items-center`,
+              tw`flex-1 rounded-2xl items-center justify-center`,
+              { minHeight: 72 },
               { backgroundColor: pin.length > 0 && !loading ? colors.primary : colors.gray200 },
             ]}
           >
             <Text style={[
-              tw`text-xl font-semibold`,
+              tw`font-semibold`,
+              { fontSize: 26, lineHeight: 30 },
               { color: pin.length > 0 && !loading ? colors.white : colors.gray400 },
             ]}>
               {loading ? '…' : 'OK'}

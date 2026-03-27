@@ -65,21 +65,21 @@ export default function LoginScreen() {
         style={tw`flex-1`}
       >
         <ScrollView
-          contentContainerStyle={tw`flex-1 items-center justify-center px-6 py-10`}
+          contentContainerStyle={tw`flex-1 items-center justify-center px-5 py-12`}
           keyboardShouldPersistTaps="handled"
         >
           {/* Tarjeta blanca — igual al desktop */}
-          <View style={[tw`bg-white rounded-2xl p-8 w-full`, { maxWidth: 380, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 20, elevation: 12 }]}>
+          <View style={[tw`bg-white rounded-3xl p-10 w-full`, { maxWidth: 420, borderRadius: 28, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 20, elevation: 12 }]}>
 
             {/* Ícono Nexo */}
             <Image
               source={require('../../assets/icon.png')}
-              style={[tw`rounded-xl mb-4`, { width: 64, height: 64, alignSelf: 'center' }]}
+              style={[tw`rounded-2xl mb-5`, { width: 78, height: 78, alignSelf: 'center' }]}
               resizeMode="contain"
             />
 
-            <Text style={tw`text-2xl font-bold text-center text-gray-800 mb-1`}>Nexo</Text>
-            <Text style={tw`text-center text-gray-500 mb-6`}>Ingrese su PIN</Text>
+            <Text style={tw`text-3xl font-bold text-center text-gray-800 mb-2`}>Nexo</Text>
+            <Text style={tw`text-lg text-center text-gray-500 mb-7`}>Ingresa tu PIN</Text>
 
             {/* PinPad */}
             <PinPad
@@ -96,24 +96,24 @@ export default function LoginScreen() {
               onPress={() => setShowConfig((v) => !v)}
               style={tw`mt-5 items-center`}
             >
-              <Text style={tw`text-sm text-gray-400`}>Configurar servidor</Text>
+              <Text style={tw`text-base text-gray-400`}>Configurar servidor</Text>
             </TouchableOpacity>
 
             {showConfig && (
-              <View style={tw`mt-3 gap-2`}>
+              <View style={tw`mt-4 gap-3`}>
                 <TextInput
                   value={serverUrl}
                   onChangeText={setServerUrlLocal}
                   placeholder="http://192.168.1.100:8001"
                   autoCapitalize="none"
                   keyboardType="url"
-                  style={[tw`border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800`, { borderWidth: 1 }]}
+                  style={[tw`border border-gray-200 rounded-xl px-4 py-4 text-base text-gray-800`, { borderWidth: 1, minHeight: 54 }]}
                 />
                 <TouchableOpacity
                   onPress={handleSaveServer}
-                  style={tw`bg-gray-800 rounded-lg py-2 items-center`}
+                  style={[tw`bg-gray-800 rounded-xl items-center`, { minHeight: 52, justifyContent: 'center' }]}
                 >
-                  <Text style={tw`text-white text-sm font-semibold`}>Guardar</Text>
+                  <Text style={tw`text-white text-base font-semibold`}>Guardar</Text>
                 </TouchableOpacity>
               </View>
             )}

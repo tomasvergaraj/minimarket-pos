@@ -8,13 +8,9 @@ import { useCartStore, cartTotal } from '../../stores/cartStore'
 import { useCashStore } from '../../stores/cashStore'
 import { listOrders, createOrder, updateOrder, cancelOrder } from '../../api/orders'
 import { clp } from '../../utils/currency'
+import { formatServerShortDate, formatServerTime } from '../../utils/date'
 import tw, { colors } from '../../utils/tw'
 import type { Order } from '../../types'
-
-/** Parse server UTC datetime */
-function parseServerDate(s: string): Date {
-  return new Date(s.endsWith('Z') || s.includes('+') ? s : s + 'Z')
-}
 
 interface Props {
   visible: boolean
@@ -142,54 +138,53 @@ export default function OrdersModal({ visible, activeOrder, onClose, onLoadOrder
 
   // ── Render open order card ───────────────────────────────────────────────
   const renderOpenOrder = ({ item: order }: { item: Order }) => {
-    const createdAt  = parseServerDate(order.created_at)
-    const timeStr    = createdAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
+    const timeStr    = formatServerTime(order.created_at)
     const orderTotal = order.items.reduce((s, i) => s + i.subtotal, 0)
     const isActive   = activeOrder?.id === order.id
 
     return (
       <View style={[
-        tw`bg-white rounded-xl px-4 py-3 mb-2`,
+        tw`bg-white rounded-2xl px-5 py-4 mb-3`,
         { elevation: 1, borderWidth: 1.5, borderColor: isActive ? colors.primary : colors.gray200 },
       ]}>
         <View style={tw`flex-row items-center`}>
           <View style={[
-            tw`w-9 h-9 rounded-full items-center justify-center mr-3`,
+            tw`w-11 h-11 rounded-full items-center justify-center mr-4`,
             { backgroundColor: isActive ? colors.primary : `${colors.primary}18` },
           ]}>
-            <Text style={[tw`font-bold text-xs`, { color: isActive ? '#fff' : colors.primary }]}>
+            <Text style={[tw`font-bold`, { color: isActive ? '#fff' : colors.primary, fontSize: 13 }]}>
               #{order.order_number}
             </Text>
           </View>
           <View style={tw`flex-1`}>
-            <Text style={tw`font-semibold text-gray-800`} numberOfLines={1}>
+            <Text style={[tw`font-semibold text-gray-800`, { fontSize: 17 }]} numberOfLines={1}>
               {order.reference || `Comanda #${order.order_number}`}
             </Text>
-            <Text style={[tw`text-xs mt-0.5`, { color: colors.gray400 }]}>
+            <Text style={[tw`mt-1`, { color: colors.gray400, fontSize: 14 }]}>
               {order.items.length} ítem{order.items.length !== 1 ? 's' : ''} · {timeStr}
             </Text>
           </View>
-          <Text style={[tw`font-bold mr-3`, { color: colors.primary }]}>{clp(orderTotal)}</Text>
+          <Text style={[tw`font-bold mr-2`, { color: colors.primary, fontSize: 18 }]}>{clp(orderTotal)}</Text>
         </View>
         {isActive && (
-          <View style={[tw`mt-2 px-2 py-1 rounded-lg`, { backgroundColor: `${colors.primary}10` }]}>
-            <Text style={[tw`text-xs font-semibold`, { color: colors.primary }]}>Comanda activa — puedes actualizarla desde "Guardar"</Text>
+          <View style={[tw`mt-3 px-3 py-2 rounded-xl`, { backgroundColor: `${colors.primary}10` }]}>
+            <Text style={[tw`font-semibold`, { color: colors.primary, fontSize: 14 }]}>Comanda activa. Puedes actualizarla desde "Guardar"</Text>
           </View>
         )}
-        <View style={[tw`flex-row mt-2`, { gap: 6 }]}>
+        <View style={[tw`flex-row mt-3`, { gap: 8 }]}>
           <TouchableOpacity
             onPress={() => handleLoad(order)}
-            style={[tw`flex-1 flex-row items-center justify-center py-2 rounded-lg gap-1`, { backgroundColor: `${colors.primary}18` }]}
+            style={[tw`flex-1 flex-row items-center justify-center rounded-xl gap-2`, { backgroundColor: `${colors.primary}18`, minHeight: 48 }]}
           >
-            <Feather name="shopping-cart" size={13} color={colors.primary} />
-            <Text style={[tw`text-xs font-semibold`, { color: colors.primary }]}>Cargar</Text>
+            <Feather name="shopping-cart" size={15} color={colors.primary} />
+            <Text style={[tw`font-semibold`, { color: colors.primary, fontSize: 14 }]}>Cargar</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => handleCancel(order)}
-            style={[tw`flex-1 flex-row items-center justify-center py-2 rounded-lg gap-1`, { backgroundColor: '#fef2f2' }]}
+            style={[tw`flex-1 flex-row items-center justify-center rounded-xl gap-2`, { backgroundColor: '#fef2f2', minHeight: 48 }]}
           >
-            <Feather name="x" size={13} color={colors.red600} />
-            <Text style={[tw`text-xs font-semibold`, { color: colors.red600 }]}>Cancelar</Text>
+            <Feather name="x" size={15} color={colors.red600} />
+            <Text style={[tw`font-semibold`, { color: colors.red600, fontSize: 14 }]}>Cancelar</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -198,29 +193,28 @@ export default function OrdersModal({ visible, activeOrder, onClose, onLoadOrder
 
   // ── Render closed order card ─────────────────────────────────────────────
   const renderClosedOrder = ({ item: order }: { item: Order }) => {
-    const createdAt  = parseServerDate(order.created_at)
-    const dateStr    = createdAt.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' })
-    const timeStr    = createdAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
+    const dateStr    = formatServerShortDate(order.created_at)
+    const timeStr    = formatServerTime(order.created_at)
     const orderTotal = order.items.reduce((s, i) => s + i.subtotal, 0)
 
     return (
-      <View style={[tw`bg-white rounded-xl px-4 py-3 mb-2`, { elevation: 1, borderWidth: 1, borderColor: colors.gray200 }]}>
+      <View style={[tw`bg-white rounded-2xl px-5 py-4 mb-3`, { elevation: 1, borderWidth: 1, borderColor: colors.gray200 }]}>
         <View style={tw`flex-row items-center`}>
-          <View style={[tw`w-9 h-9 rounded-full items-center justify-center mr-3`, { backgroundColor: colors.gray100 }]}>
-            <Text style={[tw`font-bold text-xs`, { color: colors.gray500 }]}>#{order.order_number}</Text>
+          <View style={[tw`w-11 h-11 rounded-full items-center justify-center mr-4`, { backgroundColor: colors.gray100 }]}>
+            <Text style={[tw`font-bold`, { color: colors.gray500, fontSize: 13 }]}>#{order.order_number}</Text>
           </View>
           <View style={tw`flex-1`}>
-            <Text style={tw`font-semibold text-gray-700`} numberOfLines={1}>
+            <Text style={[tw`font-semibold text-gray-700`, { fontSize: 17 }]} numberOfLines={1}>
               {order.reference || `Comanda #${order.order_number}`}
             </Text>
-            <Text style={[tw`text-xs mt-0.5`, { color: colors.gray400 }]}>
+            <Text style={[tw`mt-1`, { color: colors.gray400, fontSize: 14 }]}>
               {order.items.length} ítems · {dateStr} {timeStr}
             </Text>
           </View>
           <View style={tw`items-end`}>
-            <Text style={[tw`font-bold`, { color: colors.gray800 }]}>{clp(orderTotal)}</Text>
-            <View style={[tw`px-2 py-0.5 rounded-full mt-0.5`, { backgroundColor: '#dcfce7' }]}>
-              <Text style={[tw`text-xs font-semibold`, { color: colors.green600 }]}>Pagada</Text>
+            <Text style={[tw`font-bold`, { color: colors.gray800, fontSize: 18 }]}>{clp(orderTotal)}</Text>
+            <View style={[tw`px-3 py-1 rounded-full mt-1`, { backgroundColor: '#dcfce7' }]}>
+              <Text style={[tw`font-semibold`, { color: colors.green600, fontSize: 13 }]}>Pagada</Text>
             </View>
           </View>
         </View>
@@ -240,31 +234,35 @@ export default function OrdersModal({ visible, activeOrder, onClose, onLoadOrder
         <View style={[tw`bg-white`, { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%' }]}>
 
           {/* Header */}
-          <View style={[tw`flex-row items-center justify-between px-5 pt-5 pb-3`, { borderBottomWidth: 1, borderBottomColor: colors.gray200 }]}>
-            <View style={tw`flex-row items-center gap-2`}>
-              <Feather name="clipboard" size={18} color={colors.gray800} />
-              <Text style={tw`text-xl font-bold text-gray-800`}>Comandas</Text>
+          <View style={[tw`flex-row items-center justify-between px-6 pt-6 pb-4`, { borderBottomWidth: 1, borderBottomColor: colors.gray200 }]}>
+            <View style={tw`flex-row items-center gap-3`}>
+              <Feather name="clipboard" size={21} color={colors.gray800} />
+              <Text style={tw`text-2xl font-bold text-gray-800`}>Comandas</Text>
             </View>
-            <TouchableOpacity onPress={onClose}>
-              <Feather name="x" size={22} color={colors.gray400} />
+            <TouchableOpacity
+              onPress={onClose}
+              style={[tw`rounded-full items-center justify-center`, { width: 44, height: 44, backgroundColor: colors.gray100 }]}
+            >
+              <Feather name="x" size={20} color={colors.gray400} />
             </TouchableOpacity>
           </View>
 
           {/* Tabs */}
-          <View style={[tw`flex-row px-4 pt-3 pb-2`, { gap: 6 }]}>
+          <View style={[tw`flex-row px-5 pt-4 pb-3`, { gap: 8 }]}>
             {TABS.map(({ key, label }) => (
               <TouchableOpacity
                 key={key}
                 onPress={() => setTab(key)}
                 style={[
-                  tw`py-2 px-3 rounded-xl items-center border`,
+                  tw`px-3 rounded-2xl items-center justify-center border`,
+                  { minHeight: 52 },
                   { flex: 1 },
                   tab === key
                     ? { backgroundColor: colors.primary, borderColor: colors.primary }
                     : { borderColor: colors.gray200 },
                 ]}
               >
-                <Text style={[tw`font-semibold text-xs`, { color: tab === key ? '#fff' : colors.gray500 }]}>
+                <Text style={[tw`font-semibold text-center`, { color: tab === key ? '#fff' : colors.gray500, fontSize: 14 }]}>
                   {label}
                 </Text>
               </TouchableOpacity>
@@ -280,9 +278,9 @@ export default function OrdersModal({ visible, activeOrder, onClose, onLoadOrder
             ) : openOrders.length === 0 ? (
               <View style={tw`items-center py-12 px-5`}>
                 <Feather name="clipboard" size={40} color={colors.gray200} />
-                <Text style={[tw`mt-3 font-semibold`, { color: colors.gray400 }]}>Sin comandas abiertas</Text>
+                <Text style={[tw`mt-3 font-semibold`, { color: colors.gray400, fontSize: 17 }]}>Sin comandas abiertas</Text>
                 <TouchableOpacity onPress={() => setTab('save')} style={tw`mt-4`}>
-                  <Text style={[tw`text-sm font-semibold`, { color: colors.primary }]}>
+                  <Text style={[tw`font-semibold`, { color: colors.primary, fontSize: 16 }]}>
                     Guardar carrito como comanda →
                   </Text>
                 </TouchableOpacity>
@@ -291,7 +289,7 @@ export default function OrdersModal({ visible, activeOrder, onClose, onLoadOrder
               <FlatList
                 data={openOrders}
                 keyExtractor={(o) => o.id}
-                contentContainerStyle={tw`px-4 py-2 pb-8`}
+                contentContainerStyle={tw`px-5 py-2 pb-8`}
                 renderItem={renderOpenOrder}
               />
             )
@@ -306,13 +304,13 @@ export default function OrdersModal({ visible, activeOrder, onClose, onLoadOrder
             ) : closedOrders.length === 0 ? (
               <View style={tw`items-center py-12 px-5`}>
                 <Feather name="check-circle" size={40} color={colors.gray200} />
-                <Text style={[tw`mt-3 font-semibold`, { color: colors.gray400 }]}>Sin comandas pagadas hoy</Text>
+                <Text style={[tw`mt-3 font-semibold`, { color: colors.gray400, fontSize: 17 }]}>Sin comandas pagadas hoy</Text>
               </View>
             ) : (
               <FlatList
                 data={closedOrders}
                 keyExtractor={(o) => o.id}
-                contentContainerStyle={tw`px-4 py-2 pb-8`}
+                contentContainerStyle={tw`px-5 py-2 pb-8`}
                 renderItem={renderClosedOrder}
               />
             )
@@ -320,58 +318,58 @@ export default function OrdersModal({ visible, activeOrder, onClose, onLoadOrder
 
           {/* ── Tab: Guardar / Actualizar ─────────────────────────────── */}
           {tab === 'save' && (
-            <ScrollView contentContainerStyle={tw`px-5 py-3 pb-10`} keyboardShouldPersistTaps="handled">
+            <ScrollView contentContainerStyle={tw`px-6 py-4 pb-10`} keyboardShouldPersistTaps="handled">
               {items.length === 0 ? (
                 <View style={tw`items-center py-10`}>
                   <Feather name="shopping-cart" size={40} color={colors.gray200} />
-                  <Text style={[tw`mt-3`, { color: colors.gray400 }]}>El carrito está vacío</Text>
+                  <Text style={[tw`mt-3`, { color: colors.gray400, fontSize: 17 }]}>El carrito está vacío</Text>
                 </View>
               ) : (
                 <>
                   {/* Preview items */}
                   {items.map((i) => (
-                    <View key={i.product.id} style={[tw`flex-row items-center py-2`, { borderBottomWidth: 1, borderBottomColor: colors.gray100 }]}>
-                      <Text style={tw`flex-1 text-sm text-gray-700`} numberOfLines={1}>{i.product.name}</Text>
-                      <Text style={[tw`text-sm font-semibold mr-3`, { color: colors.gray500 }]}>×{i.quantity}</Text>
-                      <Text style={[tw`text-sm font-bold`, { color: colors.gray800 }]}>{clp(i.subtotal)}</Text>
+                    <View key={i.product.id} style={[tw`flex-row items-center py-3`, { borderBottomWidth: 1, borderBottomColor: colors.gray100 }]}>
+                      <Text style={[tw`flex-1 text-gray-700`, { fontSize: 16 }]} numberOfLines={1}>{i.product.name}</Text>
+                      <Text style={[tw`font-semibold mr-3`, { color: colors.gray500, fontSize: 16 }]}>×{i.quantity}</Text>
+                      <Text style={[tw`font-bold`, { color: colors.gray800, fontSize: 16 }]}>{clp(i.subtotal)}</Text>
                     </View>
                   ))}
-                  <View style={[tw`flex-row justify-between py-2 mb-4`, { borderBottomWidth: 2, borderBottomColor: colors.gray200 }]}>
-                    <Text style={tw`font-bold text-gray-700`}>Total</Text>
-                    <Text style={[tw`font-bold text-lg`, { color: colors.primary }]}>{clp(total)}</Text>
+                  <View style={[tw`flex-row justify-between py-3 mb-5`, { borderBottomWidth: 2, borderBottomColor: colors.gray200 }]}>
+                    <Text style={[tw`font-bold text-gray-700`, { fontSize: 18 }]}>Total</Text>
+                    <Text style={[tw`font-bold`, { color: colors.primary, fontSize: 22 }]}>{clp(total)}</Text>
                   </View>
 
                   {/* Reference */}
-                  <Text style={[tw`text-sm font-semibold mb-1`, { color: colors.gray500 }]}>Referencia (opcional)</Text>
+                  <Text style={[tw`font-semibold mb-2`, { color: colors.gray500, fontSize: 16 }]}>Referencia (opcional)</Text>
                   <TextInput
                     value={reference}
                     onChangeText={setReference}
                     placeholder="Ej: Mesa 3, Auto, Pedido 5..."
-                    style={[tw`border rounded-xl px-4 py-3 text-gray-800 mb-3`, { borderWidth: 1, borderColor: colors.gray200 }]}
+                    style={[tw`border rounded-2xl px-4 py-4 text-gray-800 mb-4`, { borderWidth: 1, borderColor: colors.gray200, fontSize: 16, minHeight: 54 }]}
                   />
 
                   {/* Notes */}
-                  <Text style={[tw`text-sm font-semibold mb-1`, { color: colors.gray500 }]}>Notas (opcional)</Text>
+                  <Text style={[tw`font-semibold mb-2`, { color: colors.gray500, fontSize: 16 }]}>Notas (opcional)</Text>
                   <TextInput
                     value={notes}
                     onChangeText={setNotes}
                     placeholder="Sin cebolla, extra salsa..."
                     multiline
                     numberOfLines={2}
-                    style={[tw`border rounded-xl px-4 py-3 text-gray-800 mb-4`, { borderWidth: 1, borderColor: colors.gray200, textAlignVertical: 'top' }]}
+                    style={[tw`border rounded-2xl px-4 py-4 text-gray-800 mb-5`, { borderWidth: 1, borderColor: colors.gray200, textAlignVertical: 'top', fontSize: 16, minHeight: 96 }]}
                   />
 
                   <TouchableOpacity
                     onPress={handleSave}
                     disabled={saving}
-                    style={[tw`py-4 rounded-xl items-center flex-row justify-center gap-2`, { backgroundColor: saving ? colors.gray200 : colors.primary }]}
+                    style={[tw`rounded-2xl items-center flex-row justify-center gap-2`, { backgroundColor: saving ? colors.gray200 : colors.primary, minHeight: 58 }]}
                   >
                     {saving ? (
                       <ActivityIndicator color="#fff" />
                     ) : (
                       <>
-                        <Feather name={activeOrder ? 'refresh-cw' : 'clipboard'} size={16} color="#fff" />
-                        <Text style={tw`text-white font-bold`}>
+                        <Feather name={activeOrder ? 'refresh-cw' : 'clipboard'} size={18} color="#fff" />
+                        <Text style={[tw`text-white font-bold text-center`, { fontSize: 16 }]}>
                           {activeOrder ? `Actualizar comanda #${activeOrder.order_number}` : `Guardar comanda (${items.length} ítem${items.length !== 1 ? 's' : ''})`}
                         </Text>
                       </>

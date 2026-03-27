@@ -42,7 +42,7 @@ export default function SearchScreen() {
       {/* Search bar */}
       <View
         style={[
-          tw`bg-white px-4 py-3`,
+          tw`bg-white px-4 py-4`,
           { borderBottomWidth: 1, borderBottomColor: colors.gray200 },
         ]}
       >
@@ -53,18 +53,18 @@ export default function SearchScreen() {
             placeholder="Nombre, SKU o código de barras..."
             returnKeyType="search"
             style={[
-              tw`flex-1 rounded-xl px-4 py-2 text-gray-800`,
-              { backgroundColor: colors.gray100 },
+              tw`flex-1 rounded-2xl px-4 py-4 text-gray-800`,
+              { backgroundColor: colors.gray100, fontSize: 17, minHeight: 56 },
             ]}
           />
           {count > 0 && (
             <View
               style={[
-                tw`rounded-full px-2 py-1 items-center justify-center`,
-                { backgroundColor: colors.primary, minWidth: 28 },
+                tw`rounded-full px-3 py-2 items-center justify-center`,
+                { backgroundColor: colors.primary, minWidth: 36, minHeight: 36 },
               ]}
             >
-              <Text style={tw`text-white text-xs font-bold`}>{count}</Text>
+              <Text style={tw`text-white text-sm font-bold`}>{count}</Text>
             </View>
           )}
         </View>
@@ -79,20 +79,20 @@ export default function SearchScreen() {
       <FlatList
         data={products}
         keyExtractor={(p) => p.id}
-        contentContainerStyle={tw`p-3`}
+        contentContainerStyle={tw`p-4 pb-6`}
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={
           !loading && debounced.trim().length >= 2 ? (
             <View style={tw`items-center py-16`}>
               <Text style={tw`text-4xl mb-2`}>🔍</Text>
-              <Text style={{ color: colors.gray400 }}>
+              <Text style={{ color: colors.gray400, fontSize: 16 }}>
                 Sin resultados para "{debounced}"
               </Text>
             </View>
           ) : !loading && query.length === 0 ? (
             <View style={tw`items-center py-16`}>
               <Text style={tw`text-4xl mb-2`}>🔍</Text>
-              <Text style={{ color: colors.gray400 }}>
+              <Text style={{ color: colors.gray400, fontSize: 16 }}>
                 Escribe al menos 2 caracteres
               </Text>
             </View>
@@ -108,22 +108,22 @@ export default function SearchScreen() {
           return (
             <View
               style={[
-                tw`bg-white rounded-xl px-4 py-3 mb-2 flex-row items-center`,
+                tw`bg-white rounded-2xl px-5 py-4 mb-3 flex-row items-center`,
                 { shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
               ]}
             >
               {/* Info */}
               <View style={tw`flex-1`}>
-                <Text style={tw`font-semibold text-gray-800`} numberOfLines={1}>
+                <Text style={[tw`font-semibold text-gray-800`, { fontSize: 17, lineHeight: 22 }]} numberOfLines={1}>
                   {item.name}
                 </Text>
-                <View style={tw`flex-row items-center gap-2 mt-0.5`}>
-                  <Text style={{ color: colors.gray400, fontSize: 11 }}>
+                <View style={tw`flex-row items-center gap-2 mt-1 flex-wrap`}>
+                  <Text style={{ color: colors.gray400, fontSize: 13 }}>
                     SKU: {item.sku}
                   </Text>
                   <Text
                     style={[
-                      { fontSize: 11 },
+                      { fontSize: 13 },
                       item.stock <= (item.min_stock ?? 0)
                         ? { color: colors.red600 }
                         : { color: colors.gray400 },
@@ -138,7 +138,8 @@ export default function SearchScreen() {
               <View style={tw`items-end mr-3`}>
                 <Text
                   style={[
-                    tw`font-bold text-base`,
+                    tw`font-bold`,
+                    { fontSize: 20, lineHeight: 24 },
                     { color: hasDiscount ? colors.red600 : colors.gray800 },
                   ]}
                 >
@@ -147,8 +148,8 @@ export default function SearchScreen() {
                 {hasDiscount && (
                   <Text
                     style={[
-                      tw`text-xs line-through`,
-                      { color: colors.gray400 },
+                      tw`line-through`,
+                      { color: colors.gray400, fontSize: 13, marginTop: 2 },
                     ]}
                   >
                     {clp(item.sell_price)}
@@ -160,11 +161,11 @@ export default function SearchScreen() {
               <TouchableOpacity
                 onPress={() => addItem(item)}
                 style={[
-                  tw`w-9 h-9 rounded-full items-center justify-center`,
-                  { backgroundColor: colors.primary },
+                  tw`rounded-full items-center justify-center`,
+                  { backgroundColor: colors.primary, width: 48, height: 48 },
                 ]}
               >
-                <Text style={{ color: '#fff', fontSize: 22, fontWeight: 'bold', lineHeight: 26 }}>
+                <Text style={{ color: '#fff', fontSize: 28, fontWeight: 'bold', lineHeight: 32 }}>
                   +
                 </Text>
               </TouchableOpacity>

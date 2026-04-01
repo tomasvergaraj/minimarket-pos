@@ -7,12 +7,14 @@ class ConfigOut(BaseModel):
     store_name: str
     store_rut: str
     store_address: str
+    business_type: str = "minimarket"
 
 
 class ConfigUpdate(BaseModel):
     store_name: str
     store_rut: str = ""
     store_address: str = ""
+    business_type: str = "minimarket"
 
 
 class ConfigResponse(BaseModel):

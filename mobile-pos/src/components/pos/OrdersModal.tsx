@@ -141,32 +141,47 @@ export default function OrdersModal({ visible, activeOrder, onClose, onLoadOrder
     const timeStr    = formatServerTime(order.created_at)
     const orderTotal = order.items.reduce((s, i) => s + i.subtotal, 0)
     const isActive   = activeOrder?.id === order.id
+    const isReady    = order.kitchen_ready
 
     return (
       <View style={[
         tw`bg-white rounded-2xl px-5 py-4 mb-3`,
-        { elevation: 1, borderWidth: 1.5, borderColor: isActive ? colors.primary : colors.gray200 },
+        { elevation: 1, borderWidth: 1.5, borderColor: isReady ? '#16a34a' : isActive ? colors.primary : colors.gray200 },
       ]}>
         <View style={tw`flex-row items-center`}>
           <View style={[
             tw`w-11 h-11 rounded-full items-center justify-center mr-4`,
-            { backgroundColor: isActive ? colors.primary : `${colors.primary}18` },
+            { backgroundColor: isReady ? '#dcfce7' : isActive ? colors.primary : `${colors.primary}18` },
           ]}>
-            <Text style={[tw`font-bold`, { color: isActive ? '#fff' : colors.primary, fontSize: 13 }]}>
+            <Text style={[tw`font-bold`, { color: isReady ? '#16a34a' : isActive ? '#fff' : colors.primary, fontSize: 13 }]}>
               #{order.order_number}
             </Text>
           </View>
           <View style={tw`flex-1`}>
-            <Text style={[tw`font-semibold text-gray-800`, { fontSize: 17 }]} numberOfLines={1}>
-              {order.reference || `Comanda #${order.order_number}`}
-            </Text>
+            <View style={tw`flex-row items-center gap-2`}>
+              <Text style={[tw`font-semibold text-gray-800`, { fontSize: 17 }]} numberOfLines={1}>
+                {order.reference || `Comanda #${order.order_number}`}
+              </Text>
+              {isReady && (
+                <View style={[tw`flex-row items-center gap-1 px-2 py-0.5 rounded-full`, { backgroundColor: '#dcfce7' }]}>
+                  <Feather name="check-circle" size={11} color="#16a34a" />
+                  <Text style={{ color: '#16a34a', fontSize: 11, fontWeight: '700' }}>Listo</Text>
+                </View>
+              )}
+            </View>
             <Text style={[tw`mt-1`, { color: colors.gray400, fontSize: 14 }]}>
               {order.items.length} ítem{order.items.length !== 1 ? 's' : ''} · {timeStr}
             </Text>
           </View>
           <Text style={[tw`font-bold mr-2`, { color: colors.primary, fontSize: 18 }]}>{clp(orderTotal)}</Text>
         </View>
-        {isActive && (
+        {isReady && (
+          <View style={[tw`mt-3 px-3 py-2 rounded-xl flex-row items-center gap-2`, { backgroundColor: '#f0fdf4' }]}>
+            <Feather name="check-circle" size={14} color="#16a34a" />
+            <Text style={[tw`font-semibold`, { color: '#16a34a', fontSize: 14 }]}>Preparado — listo para entregar o cobrar</Text>
+          </View>
+        )}
+        {!isReady && isActive && (
           <View style={[tw`mt-3 px-3 py-2 rounded-xl`, { backgroundColor: `${colors.primary}10` }]}>
             <Text style={[tw`font-semibold`, { color: colors.primary, fontSize: 14 }]}>Comanda activa. Puedes actualizarla desde "Guardar"</Text>
           </View>

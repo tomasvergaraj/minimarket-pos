@@ -197,6 +197,7 @@ export interface Order {
   notes?: string | null
   sale_id?: string | null
   bill_requested: boolean
+  kitchen_ready: boolean
   created_at: string
   updated_at: string
   items: OrderItemOut[]
@@ -206,5 +207,6 @@ export interface OrderCreate {
   register_id: string
   reference?: string
   notes?: string
+  table_id?: string
   items: { product_id: string; quantity: number }[]
 }

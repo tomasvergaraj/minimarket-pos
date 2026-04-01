@@ -32,6 +32,8 @@ class Order(Base):
     table_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("tables.id", ondelete="SET NULL"), nullable=True)
     # Whether the customer has requested the bill
     bill_requested: Mapped[bool] = mapped_column(sa.Boolean, default=False, nullable=False)
+    # Whether the kitchen has marked this order as ready (prepared)
+    kitchen_ready: Mapped[bool] = mapped_column(sa.Boolean, default=False, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

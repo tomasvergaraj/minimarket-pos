@@ -190,7 +190,8 @@ def open_session(
         .first()
     )
     if existing:
-        raise HTTPException(400, "Register already has an open session")
+        # Return the existing session so multiple devices can join the same shift
+        return existing
 
     session = CashSession(
         register_id=data.register_id,
@@ -219,7 +220,8 @@ def close_session(
     if not session:
         raise HTTPException(404, "Session not found")
     if session.status != SessionStatus.OPEN:
-        raise HTTPException(400, "Session is already closed")
+        # Already closed — return idempotently so any device can call this safely
+        return session
     if session.user_id and session.user_id != current_user.id and current_user.role != "admin":
         raise HTTPException(403, "Session belongs to another user")
 

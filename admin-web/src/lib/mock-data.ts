@@ -581,4 +581,5 @@ export const mockConfig: StoreConfig = {
   store_name: 'Nexo Demo',
   store_rut: '76.123.456-7',
   store_address: 'Av. Principal 123, Santiago',
+  business_type: 'minimarket',
 }

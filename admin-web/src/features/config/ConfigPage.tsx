@@ -14,7 +14,7 @@ import {
 import PageHeader from '../../components/patterns/PageHeader'
 import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
-import type { StoreConfig } from '../../types'
+import type { BusinessType, StoreConfig } from '../../types'
 import { useLicense } from '../../context/LicenseContext'
 import {
   activateLicense,
@@ -42,7 +42,7 @@ function statusTone(status: string, active: boolean): string {
 }
 
 export default function ConfigPage() {
-  const [config, setConfig] = useState<StoreConfig>({ store_name: '', store_rut: '', store_address: '' })
+  const [config, setConfig] = useState<StoreConfig>({ store_name: '', store_rut: '', store_address: '', business_type: 'minimarket' })
   const [loading, setLoading] = useState(false)
   const [serverUrl, setServerUrlState] = useState(getServerUrl())
   const [activatingLicense, setActivatingLicense] = useState(false)
@@ -158,6 +158,23 @@ export default function ConfigPage() {
               onChange={set('store_address')}
               placeholder="Av. Principal 123, Santiago"
             />
+            <div className="space-y-1">
+              <label className="block text-[13px] font-medium text-text-secondary">Tipo de negocio</label>
+              <select
+                value={config.business_type}
+                onChange={(e) => setConfig((c) => ({ ...c, business_type: e.target.value as BusinessType }))}
+                className="w-full h-9 px-2.5 text-[13px] rounded-md border border-border bg-white text-text-secondary focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+              >
+                <option value="minimarket">Minimarket / Abarrotes</option>
+                <option value="restaurant">Restaurant / Bar</option>
+                <option value="cafeteria">Cafetería / Heladería</option>
+                <option value="foodtruck">Food Truck / Comida rápida</option>
+                <option value="botilleria">Botillería / Licorería</option>
+                <option value="farmacia">Farmacia / Droguería</option>
+                <option value="otro">Otro</option>
+              </select>
+              <p className="text-caption text-text-muted">Adapta las etiquetas del sistema (Comanda vs Pedido, Mesa vs Referencia).</p>
+            </div>
           </div>
 
           <Button type="submit" loading={loading}>

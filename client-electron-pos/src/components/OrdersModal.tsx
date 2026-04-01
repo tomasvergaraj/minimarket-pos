@@ -301,7 +301,7 @@ export default function OrdersModal({ onClose, onLoadOrder }: Props) {
               ) : (
                 <div className="space-y-2">
                   {orders.map((order) => (
-                    <div key={order.id} className="border rounded-xl p-3 hover:bg-gray-50 transition">
+                    <div key={order.id} className={`border rounded-xl p-3 hover:bg-gray-50 transition ${order.kitchen_ready ? 'border-green-400 bg-green-50' : ''}`}>
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-bold text-gray-800">#{order.order_number}</span>
@@ -311,6 +311,11 @@ export default function OrdersModal({ onClose, onLoadOrder }: Props) {
                             </span>
                           )}
                           <StatusBadge status={order.status} />
+                          {order.kitchen_ready && (
+                            <span className="flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                              <CheckCircle size={10} /> Listo
+                            </span>
+                          )}
                         </div>
                         <span className="text-xs text-gray-400 shrink-0">{formatDate(order.created_at)}</span>
                       </div>

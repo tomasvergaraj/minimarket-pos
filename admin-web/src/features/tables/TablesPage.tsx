@@ -11,7 +11,7 @@ import {
   updateTable,
   deleteTable,
 } from '../../lib/services'
-import { formatCLP } from '../../lib/format'
+import { formatCLP, parseUTC } from '../../lib/format'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -437,7 +437,7 @@ function TableFormModal({ initial, allTables, onSave, onClose, onDelete }: FormP
 // ── Table Card ────────────────────────────────────────────────────────────────
 
 function timeElapsed(dateStr: string): string {
-  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
+  const diff = Math.max(0, Math.floor((Date.now() - parseUTC(dateStr).getTime()) / 1000))
   if (diff < 60) return `${diff}s`
   if (diff < 3600) return `${Math.floor(diff / 60)}min`
   return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}min`

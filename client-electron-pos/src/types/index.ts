@@ -157,6 +157,7 @@ export interface Order {
   sale_id: string | null;
   table_id: string | null;
   bill_requested: boolean;
+  kitchen_ready: boolean;
   created_at: string;
   updated_at: string;
   items: OrderItem[];

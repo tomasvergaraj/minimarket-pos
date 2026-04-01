@@ -49,7 +49,8 @@ function sevenDaysAgo() {
 }
 
 function fmtDatetime(iso: string) {
-  return new Date(iso).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })
+  const normalized = iso && !iso.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(iso) ? `${iso}Z` : iso
+  return new Date(normalized).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })
 }
 
 function parseDetail(raw: string | null): string {

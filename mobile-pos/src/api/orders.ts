@@ -5,6 +5,7 @@ export interface OrderPatch {
   items?: { product_id: string; quantity: number }[]
   reference?: string | null
   notes?: string | null
+  table_id?: string | null
 }
 
 export async function listOrders(params?: { status?: string; register_id?: string; limit?: number }): Promise<Order[]> {

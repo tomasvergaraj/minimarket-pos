@@ -23,6 +23,7 @@ class OrderPatch(BaseModel):
     notes: str | None = None
     table_id: str | None = None
     bill_requested: bool | None = None
+    kitchen_ready: bool | None = None
 
 
 class OrderItemOut(BaseModel):
@@ -48,6 +49,7 @@ class OrderOut(BaseModel):
     sale_id: str | None
     table_id: str | None
     bill_requested: bool
+    kitchen_ready: bool
     created_at: datetime
     updated_at: datetime
     items: list[OrderItemOut]

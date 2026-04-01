@@ -13,7 +13,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from app.core.limiter import limiter
 
-from app.api.deps import require_admin
+from app.api.deps import require_admin, get_current_user
 from app.core.config import ROOT_DIR, settings
 from app.api.routes import products, sales, cash, kardex, reports, users, dashboard, orders, license, categories, suppliers, purchases, promotions, customers, notifications, expenses, tables, sync, audit
 from app.schemas.config import ConfigUpdate, ConfigResponse
@@ -147,12 +147,13 @@ def health():
     return {"status": "ok", "store": settings.STORE_NAME}
 
 
-@app.get("/api/config", dependencies=[Depends(require_admin)])
+@app.get("/api/config", dependencies=[Depends(get_current_user)])
 def get_config():
     return {
         "store_name": settings.STORE_NAME,
         "store_rut": settings.STORE_RUT,
         "store_address": settings.STORE_ADDRESS,
+        "business_type": settings.BUSINESS_TYPE,
         "smtp_configured": settings.smtp_configured,
     }
 
@@ -162,12 +163,14 @@ def update_config(data: ConfigUpdate):
     settings.STORE_NAME = data.store_name
     settings.STORE_RUT = data.store_rut
     settings.STORE_ADDRESS = data.store_address
+    settings.BUSINESS_TYPE = data.business_type
     return {
         "success": True,
         "data": {
             "store_name": settings.STORE_NAME,
             "store_rut": settings.STORE_RUT,
             "store_address": settings.STORE_ADDRESS,
+            "business_type": settings.BUSINESS_TYPE,
         },
         "error": None,
     }

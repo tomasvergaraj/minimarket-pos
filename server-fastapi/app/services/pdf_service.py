@@ -1,5 +1,6 @@
 """Generate thermal-style PDF receipts using reportlab."""
 import io
+from zoneinfo import ZoneInfo
 
 from reportlab.lib import colors
 from reportlab.lib.units import mm
@@ -57,7 +58,9 @@ def generate_receipt_pdf(sale) -> bytes:
 
     # ── Sale info ─────────────────────────────────────────────────────────────
     elems.append(Paragraph(f"<b>Boleta N° {sale.sale_number}</b>", center))
-    fecha = sale.created_at.strftime("%d/%m/%Y  %H:%M")
+    _chile_tz = ZoneInfo("America/Santiago")
+    _local_dt = sale.created_at.replace(tzinfo=ZoneInfo("UTC")).astimezone(_chile_tz)
+    fecha = _local_dt.strftime("%d/%m/%Y  %H:%M")
     elems.append(Paragraph(fecha, center_sm))
 
     elems.append(Spacer(1, 3 * mm))

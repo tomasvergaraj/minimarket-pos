@@ -29,7 +29,7 @@ export async function closeCashSession(
 
 export async function getActiveSessions(): Promise<CashSession[]> {
   const { data } = await api.get<CashSession[]>('/cash/sessions/active')
-  return data
+  return Array.isArray(data) ? data : []
 }
 
 export async function getCashSession(sessionId: string): Promise<CashSession> {

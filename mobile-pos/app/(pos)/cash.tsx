@@ -9,11 +9,11 @@ import { Feather } from '@expo/vector-icons'
 import { useCashStore } from '../../src/stores/cashStore'
 import { useCartStore } from '../../src/stores/cartStore'
 import { useAuthStore } from '../../src/stores/authStore'
-import { listRegisters, openCashSession, closeCashSession, getCashSession } from '../../src/api/cash'
+import { listRegisters, openCashSession, closeCashSession, getCashSession, getActiveSessions } from '../../src/api/cash'
 import { clp } from '../../src/utils/currency'
 import { formatServerDate, formatServerTime } from '../../src/utils/date'
 import tw, { colors } from '../../src/utils/tw'
-import type { CashRegister } from '../../src/types'
+import type { CashRegister, CashSession } from '../../src/types'
 
 export default function CashScreen() {
   const { session, register, setSession, updateSession, clearSession } = useCashStore()
@@ -21,6 +21,7 @@ export default function CashScreen() {
   const { logout } = useAuthStore()
 
   const [registers, setRegisters]         = useState<CashRegister[]>([])
+  const [activeSessions, setActiveSessions] = useState<CashSession[]>([])
   const [selected, setSelected]           = useState<CashRegister | null>(null)
   const [openingAmount, setOpeningAmount] = useState('')
   const [closingAmount, setClosingAmount] = useState('')
@@ -31,27 +32,44 @@ export default function CashScreen() {
   useEffect(() => {
     if (!session) {
       setLoadingRegs(true)
-      listRegisters()
-        .then(setRegisters)
+      Promise.all([listRegisters(), getActiveSessions()])
+        .then(([regs, sessions]) => { setRegisters(regs); setActiveSessions(sessions) })
         .catch(() => Alert.alert('Error', 'No se pudieron cargar las cajas'))
         .finally(() => setLoadingRegs(false))
+    } else {
+      // On mount with a cached session, verify it's still open on the server
+      getCashSession(session.id)
+        .then((fresh) => {
+          if (fresh.status === 'closed') {
+            clearCart()
+            clearSession()
+          } else {
+            updateSession(fresh)
+          }
+        })
+        .catch(() => {})
     }
-  }, [session])
+  }, [])
 
-  // Refresh session totals from server
+  // Refresh session totals from server — also detects if closed elsewhere
   const handleRefresh = async () => {
     if (!session) return
     setRefreshing(true)
     try {
       const fresh = await getCashSession(session.id)
-      updateSession(fresh)
+      if (fresh.status === 'closed') {
+        clearCart()
+        clearSession()
+      } else {
+        updateSession(fresh)
+      }
     } catch {}
     setRefreshing(false)
   }
 
-  // ── Open session ──────────────────────────────────────────────────────────
-  const handleOpen = async () => {
-    if (!selected) { Alert.alert('Selecciona una caja'); return }
+  // ── Open / join session ───────────────────────────────────────────────────
+  const doOpenSession = async () => {
+    if (!selected) return
     setLoading(true)
     try {
       const newSession = await openCashSession(selected.id, parseFloat(openingAmount || '0'))
@@ -60,6 +78,23 @@ export default function CashScreen() {
       Alert.alert('Error', err?.message ?? 'No se pudo abrir la sesión')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleOpen = () => {
+    if (!selected) { Alert.alert('Selecciona una caja'); return }
+    const existing = activeSessions.find((s) => s.register_id === selected.id)
+    if (existing) {
+      Alert.alert(
+        'Sesión activa',
+        `La caja "${selected.name}" ya tiene una sesión abierta. ¿Deseas conectarte a ella?`,
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Conectarme', onPress: doOpenSession },
+        ],
+      )
+    } else {
+      void doOpenSession()
     }
   }
 
@@ -81,7 +116,15 @@ export default function CashScreen() {
               clearSession()
               setClosingAmount('')
             } catch (err: any) {
-              Alert.alert('Error', err?.message ?? 'No se pudo cerrar la sesión')
+              // If already closed on another device, just clear local state
+              const msg: string = err?.response?.data?.detail ?? err?.message ?? ''
+              if (msg.toLowerCase().includes('closed') || msg.toLowerCase().includes('cerrada')) {
+                clearCart()
+                clearSession()
+                setClosingAmount('')
+              } else {
+                Alert.alert('Error', msg || 'No se pudo cerrar la sesión')
+              }
             } finally {
               setLoading(false)
             }
@@ -251,28 +294,38 @@ export default function CashScreen() {
               No hay cajas activas
             </Text>
           ) : (
-            registers.map((r) => (
-              <TouchableOpacity
-                key={r.id}
-                onPress={() => setSelected(r)}
-                style={[
-                  tw`flex-row items-center px-5 py-4 rounded-2xl mb-3 border`,
-                  selected?.id === r.id
-                    ? { backgroundColor: `${colors.primary}15`, borderColor: colors.primary }
-                    : { borderColor: colors.gray200 },
-                ]}
-              >
-                <View style={[
-                  tw`w-5 h-5 rounded-full border-2 mr-4`,
-                  selected?.id === r.id
-                    ? { borderColor: colors.primary, backgroundColor: colors.primary }
-                    : { borderColor: colors.gray400 },
-                ]} />
-                <Text style={[tw`font-semibold`, { color: selected?.id === r.id ? colors.primary : colors.gray800, fontSize: 17 }]}>
-                  {r.name}
-                </Text>
-              </TouchableOpacity>
-            ))
+            registers.map((r) => {
+              const isSel = selected?.id === r.id
+              const hasActive = activeSessions.some((s) => s.register_id === r.id)
+              return (
+                <TouchableOpacity
+                  key={r.id}
+                  onPress={() => setSelected(r)}
+                  style={[
+                    tw`flex-row items-center px-5 py-4 rounded-2xl mb-3 border`,
+                    isSel
+                      ? { backgroundColor: `${colors.primary}15`, borderColor: colors.primary }
+                      : { borderColor: colors.gray200 },
+                  ]}
+                >
+                  <View style={[
+                    tw`w-5 h-5 rounded-full border-2 mr-4`,
+                    isSel
+                      ? { borderColor: colors.primary, backgroundColor: colors.primary }
+                      : { borderColor: colors.gray400 },
+                  ]} />
+                  <Text style={[tw`font-semibold flex-1`, { color: isSel ? colors.primary : colors.gray800, fontSize: 17 }]}>
+                    {r.name}
+                  </Text>
+                  {hasActive && (
+                    <View style={[tw`flex-row items-center gap-1 px-2 py-1 rounded-full ml-2`, { backgroundColor: '#dcfce7' }]}>
+                      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.green600 }} />
+                      <Text style={{ color: colors.green600, fontSize: 12, fontWeight: '700' }}>En uso</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              )
+            })
           )}
         </View>
 
@@ -295,7 +348,9 @@ export default function CashScreen() {
         >
           {loading ? <ActivityIndicator color="#fff" /> : (
             <Text style={[tw`font-bold`, { color: !selected ? colors.gray400 : '#fff', fontSize: 18 }]}>
-              Abrir caja
+              {selected && activeSessions.some((s) => s.register_id === selected.id)
+                ? 'Conectarme a sesión activa'
+                : 'Abrir caja'}
             </Text>
           )}
         </TouchableOpacity>

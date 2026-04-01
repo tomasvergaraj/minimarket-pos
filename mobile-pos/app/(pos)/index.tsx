@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, TouchableOpacity, FlatList,
   Modal, TextInput, Alert, ActivityIndicator,
-  ScrollView, Keyboard, Image,
+  ScrollView, Keyboard, Image, Switch,
   Animated, Dimensions, StyleSheet,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -12,13 +12,22 @@ import { useCartStore, cartTotal, cartCount } from '../../src/stores/cartStore'
 import { useCashStore } from '../../src/stores/cashStore'
 import { useAuthStore } from '../../src/stores/authStore'
 import { useFavoritesStore } from '../../src/stores/favoritesStore'
-import { searchProducts, getProductById } from '../../src/api/products'
-import { createSale } from '../../src/api/sales'
+import { usePrinterStore } from '../../src/stores/printerStore'
+import { searchProducts, getProductById, getByBarcode, syncProductCache } from '../../src/api/products'
+import { enqueue, flushQueue, getPendingCount } from '../../src/db/saleQueue'
+import NetInfo from '@react-native-community/netinfo'
+import { CameraView, useCameraPermissions } from 'expo-camera'
+import { createSale, getReceiptPref } from '../../src/api/sales'
+import { createOrder, updateOrder } from '../../src/api/orders'
+import { fetchTableStatuses } from '../../src/api/tables'
+import { listOrders } from '../../src/api/orders'
 import { getCashSession } from '../../src/api/cash'
 import { searchCustomers, getLoyaltyConfig } from '../../src/api/customers'
+import { fetchStoreConfig, orderLabel } from '../../src/api/config'
 import { clp } from '../../src/utils/currency'
 import tw, { colors } from '../../src/utils/tw'
 import OrdersModal from '../../src/components/pos/OrdersModal'
+import ReceiptPreviewModal from '../../src/components/pos/ReceiptPreviewModal'
 import type { LoyaltyConfig } from '../../src/api/customers'
 import type { Customer, FavoriteSlot, Order, Product } from '../../src/types'
 
@@ -52,6 +61,7 @@ export default function POSScreen() {
   const count      = useCartStore(cartCount)
   const { user, logout } = useAuthStore()
   const { slots, loaded: favsLoaded, load: loadFavs, setSlot, clearSlot, gridSize, setGridSize } = useFavoritesStore()
+  const printer = usePrinterStore()
 
   // ── Search ────────────────────────────────────────────────────────────────
   const [query, setQuery]         = useState('')
@@ -78,6 +88,33 @@ export default function POSScreen() {
   const [activeOrder, setActiveOrder] = useState<Order | null>(null)
   const [showOrders, setShowOrders]   = useState(false)
 
+  // ── Quick save order from cart ────────────────────────────────────────────
+  const [showOrderRef, setShowOrderRef] = useState(false)
+  const [orderRef, setOrderRef]         = useState('')
+  const [savingOrder, setSavingOrder]   = useState(false)
+  const [tables, setTables]             = useState<import('../../src/api/tables').TableStatus[]>([])
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(null)
+
+  // ── Offline / sync ────────────────────────────────────────────────────────
+  const [isOffline, setIsOffline]       = useState(false)
+  const [pendingCount, setPendingCount] = useState(0)
+  const [isSyncing, setIsSyncing]       = useState(false)
+  const [cacheCount, setCacheCount]     = useState<number | null>(null)
+
+  // ── Barcode scanner ───────────────────────────────────────────────────────
+  const [showScanner, setShowScanner]     = useState(false)
+  const [scanned, setScanned]             = useState(false)
+  const [scannerBusy, setScannerBusy]     = useState(false)
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions()
+
+  // ── Business type ─────────────────────────────────────────────────────────
+  const [businessType, setBusinessType] = useState('minimarket')
+  const [storeName, setStoreName]       = useState(printer.storeName)
+  const [receiptSale, setReceiptSale]   = useState<import('../../src/types').Sale | null>(null)
+
+  // ── Kitchen-ready count (for header badge) ────────────────────────────────
+  const [kitchenReadyCount, setKitchenReadyCount] = useState(0)
+
   // ── Payment modal ─────────────────────────────────────────────────────────
   const [showPay, setShowPay]         = useState(false)
   const [method, setMethod]           = useState<Method>('card')
@@ -85,6 +122,7 @@ export default function POSScreen() {
   const [cardAmt, setCardAmt]         = useState('')
   const [transferAmt, setTransferAmt] = useState('')
   const [paying, setPaying]           = useState(false)
+  const [receiptOnSale, setReceiptOnSale] = useState(() => getReceiptPref())
 
   // ── Customer / loyalty ────────────────────────────────────────────────────
   const [loyaltyConfig, setLoyaltyConfig]         = useState<LoyaltyConfig>({ points_per_thousand: 1, point_value: 1 })
@@ -98,7 +136,68 @@ export default function POSScreen() {
   useEffect(() => {
     if (!favsLoaded) loadFavs()
     getLoyaltyConfig().then(setLoyaltyConfig).catch(() => {})
+    fetchStoreConfig().then((cfg) => {
+      if (cfg.business_type) setBusinessType(cfg.business_type)
+      if (cfg.store_name) setStoreName(cfg.store_name)
+    }).catch(() => {})
+    // Pending count inicial
+    getPendingCount().then(setPendingCount).catch(() => {})
   }, [])
+
+  // ── Sync caché al abrir sesión ────────────────────────────────────────────
+  useEffect(() => {
+    if (!cashSession) return
+    setIsSyncing(true)
+    syncProductCache()
+      .then((n) => setCacheCount(n))
+      .catch(() => {})
+      .finally(() => setIsSyncing(false))
+  }, [cashSession?.id])
+
+  // ── Conectividad: detectar offline + retry cola al reconectar ─────────────
+  useEffect(() => {
+    const unsub = NetInfo.addEventListener(async (state) => {
+      const online = state.isConnected === true && state.isInternetReachable !== false
+      setIsOffline(!online)
+      if (online) {
+        const count = await getPendingCount()
+        if (count > 0) {
+          setIsSyncing(true)
+          try {
+            const { synced, failed } = await flushQueue(
+              (payload) => import('../../src/api/sales').then((m) => m.createSale(payload))
+            )
+            const remaining = await getPendingCount()
+            setPendingCount(remaining)
+            if (synced > 0) {
+              Alert.alert(
+                'Ventas sincronizadas',
+                failed > 0
+                  ? `${synced} venta${synced !== 1 ? 's' : ''} enviada${synced !== 1 ? 's' : ''}. ${failed} pendiente${failed !== 1 ? 's' : ''}.`
+                  : `${synced} venta${synced !== 1 ? 's' : ''} enviada${synced !== 1 ? 's' : ''} correctamente.`,
+              )
+            }
+          } finally {
+            setIsSyncing(false)
+          }
+        }
+      }
+    })
+    return unsub
+  }, [])
+
+  // ── Poll kitchen-ready count every 12 s ───────────────────────────────────
+  useEffect(() => {
+    if (!cashSession) return
+    const checkKitchenReady = () => {
+      listOrders({ status: 'open', limit: 50 })
+        .then((orders) => setKitchenReadyCount(orders.filter((o) => o.kitchen_ready).length))
+        .catch(() => {})
+    }
+    checkKitchenReady()
+    const id = setInterval(checkKitchenReady, 12_000)
+    return () => clearInterval(id)
+  }, [cashSession])
 
   // ── Search debounce ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -200,6 +299,37 @@ export default function POSScreen() {
     setDiscountValue('')
   }
 
+  // ── Barcode scanner handlers ──────────────────────────────────────────────
+  const openScanner = async () => {
+    if (!cameraPermission?.granted) {
+      const result = await requestCameraPermission()
+      if (!result.granted) {
+        Alert.alert('Permiso requerido', 'Necesitas permitir acceso a la cámara para escanear códigos de barras')
+        return
+      }
+    }
+    setScanned(false)
+    setShowScanner(true)
+  }
+
+  const handleBarcodeScan = async ({ data }: { data: string }) => {
+    if (scanned || scannerBusy) return
+    setScanned(true)
+    setScannerBusy(true)
+    try {
+      const product = await getByBarcode(data)
+      setShowScanner(false)
+      handleAddProduct(product)
+    } catch {
+      Alert.alert('Producto no encontrado', `Código: ${data}`, [
+        { text: 'Escanear de nuevo', onPress: () => { setScanned(false); setScannerBusy(false) } },
+        { text: 'Cerrar', onPress: () => { setShowScanner(false); setScannerBusy(false) } },
+      ])
+    } finally {
+      setScannerBusy(false)
+    }
+  }
+
   // ── Logout ────────────────────────────────────────────────────────────────
   const handleLogout = () => {
     Alert.alert('Cerrar sesión', '¿Salir del sistema?', [
@@ -211,6 +341,7 @@ export default function POSScreen() {
   // ── Payment ───────────────────────────────────────────────────────────────
   const loyaltyDiscount = Math.min(pointsToRedeem * loyaltyConfig.point_value, total)
   const effectiveTotal  = total - loyaltyDiscount
+  const labels = orderLabel(businessType)
   const cashNum     = parseInt(cashAmt)     || 0
   const cardNum     = parseInt(cardAmt)     || 0
   const transferNum = parseInt(transferAmt) || 0
@@ -226,6 +357,7 @@ export default function POSScreen() {
     setMethod('card'); setCashAmt(''); setCardAmt(''); setTransferAmt('')
     setSelectedCustomer(null); setCustomerQuery(''); setCustomerResults([])
     setPointsToRedeem(0)
+    setReceiptOnSale(getReceiptPref())
   }
 
   // ── Order callbacks ───────────────────────────────────────────────────────
@@ -252,6 +384,54 @@ export default function POSScreen() {
     setShowOrders(false)
   }
 
+  const openSaveOrder = () => {
+    setShowOrderRef(true)
+    setOrderRef(activeOrder?.reference ?? '')
+    setSelectedTableId(null)
+    fetchTableStatuses().then(setTables).catch(() => {})
+  }
+
+  const closeSaveOrder = () => {
+    setShowOrderRef(false)
+    setOrderRef('')
+    setSelectedTableId(null)
+  }
+
+  const handleSaveOrder = async () => {
+    if (!cashSession || items.length === 0) return
+    setSavingOrder(true)
+    try {
+      let saved: Order
+      const refValue = orderRef.trim() || undefined
+      if (activeOrder) {
+        saved = await updateOrder(activeOrder.id, {
+          items: items.map((i) => ({ product_id: i.product.id, quantity: i.quantity })),
+          reference: refValue ?? null,
+          table_id: selectedTableId,
+        })
+      } else {
+        saved = await createOrder({
+          register_id: cashSession.register_id,
+          reference: refValue,
+          table_id: selectedTableId ?? undefined,
+          items: items.map((i) => ({ product_id: i.product.id, quantity: i.quantity })),
+        })
+      }
+      setActiveOrder(saved)
+      clear()
+      closeSaveOrder()
+      closeCart()
+      Alert.alert(
+        activeOrder ? `${labels.order} actualizada` : `${labels.order} enviada`,
+        `#${saved.order_number}${saved.reference ? ` · ${saved.reference}` : ''}`,
+      )
+    } catch (err: any) {
+      Alert.alert('Error', err?.message ?? `No se pudo guardar la ${labels.order.toLowerCase()}`)
+    } finally {
+      setSavingOrder(false)
+    }
+  }
+
   // ── Pay ───────────────────────────────────────────────────────────────────
   const handlePay = async () => {
     if (!cashSession || items.length === 0 || !canPay) return
@@ -273,14 +453,49 @@ export default function POSScreen() {
       clear()
       setActiveOrder(null)
       setShowPay(false)
+      const wasReceiptOn = receiptOnSale
       resetPay()
       const lines: string[] = []
       if (change > 0) lines.push(`Vuelto: ${clp(change)}`)
       if (sale.points_earned > 0) lines.push(`+${sale.points_earned} puntos ganados`)
       if (pointsToRedeem > 0) lines.push(`${pointsToRedeem} puntos canjeados`)
       Alert.alert('Venta completada', lines.length > 0 ? lines.join('\n') : '✓ Registrada correctamente')
+      if (wasReceiptOn) {
+        setReceiptSale(sale)
+      }
     } catch (err: any) {
-      Alert.alert('Error', err?.message ?? 'Intenta nuevamente')
+      // Sin red → encolar para sincronizar después
+      if (!err?.response) {
+        try {
+          const salePayload = {
+            cash_session_id: cashSession!.id,
+            register_id:     cashSession!.register_id,
+            seller_id:       user?.id,
+            items: items.map((i) => ({ product_id: i.product.id, quantity: i.quantity, unit_price_override: i.unit_price })),
+            payment_method:  method,
+            cash_amount:     method === 'card' || method === 'transfer' ? 0 : cashNum,
+            card_amount:     method === 'cash' || method === 'transfer' ? 0 : method === 'card' ? effectiveTotal : cardNum,
+            transfer_amount: method === 'transfer' ? effectiveTotal : method === 'mixed' ? transferNum : 0,
+            ...(activeOrder ? { order_ids: [activeOrder.id] } : {}),
+            ...(selectedCustomer ? { customer_id: selectedCustomer.id, points_to_redeem: pointsToRedeem } : {}),
+          }
+          await enqueue(salePayload)
+          const newCount = await getPendingCount()
+          setPendingCount(newCount)
+          clear()
+          setActiveOrder(null)
+          setShowPay(false)
+          resetPay()
+          Alert.alert(
+            'Venta guardada offline',
+            `Sin conexión al servidor. La venta quedó en cola (${newCount} pendiente${newCount !== 1 ? 's' : ''}).\nSe enviará automáticamente al reconectar.`,
+          )
+        } catch {
+          Alert.alert('Error', 'No se pudo guardar la venta. Verifica la conexión.')
+        }
+      } else {
+        Alert.alert('Error', err?.message ?? 'Intenta nuevamente')
+      }
     } finally {
       setPaying(false)
     }
@@ -573,7 +788,7 @@ export default function POSScreen() {
           <Text style={[tw`font-bold`, { color: colors.primary, fontSize: 17 }]}>{register?.name ?? 'Caja'}</Text>
           {activeOrder && (
             <Text style={[tw`text-sm`, { color: colors.gray400, fontSize: 14 }]} numberOfLines={1}>
-              Comanda #{activeOrder.order_number}{activeOrder.reference ? ` · ${activeOrder.reference}` : ''}
+              {labels.order} #{activeOrder.order_number}{activeOrder.reference ? ` · ${activeOrder.reference}` : ''}
             </Text>
           )}
         </View>
@@ -583,6 +798,15 @@ export default function POSScreen() {
           style={[tw`rounded-xl items-center justify-center`, { backgroundColor: activeOrder ? `${colors.primary}18` : colors.gray100, width: HEADER_BUTTON_SIZE, height: HEADER_BUTTON_SIZE }]}
         >
           <Feather name="clipboard" size={20} color={activeOrder ? colors.primary : colors.gray500} />
+          {kitchenReadyCount > 0 && (
+            <View style={{
+              position: 'absolute', top: 4, right: 4,
+              backgroundColor: '#16a34a', borderRadius: 8,
+              minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
+            }}>
+              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{kitchenReadyCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
         {/* Cart toggle with badge */}
         <TouchableOpacity
@@ -602,6 +826,21 @@ export default function POSScreen() {
             )}
           </View>
         </TouchableOpacity>
+        {/* Pending sales badge */}
+        {pendingCount > 0 && (
+          <TouchableOpacity
+            onPress={() => Alert.alert(
+              'Ventas pendientes',
+              `Hay ${pendingCount} venta${pendingCount !== 1 ? 's' : ''} en cola offline.\nSe sincronizarán automáticamente al recuperar conexión.`,
+            )}
+            style={[tw`rounded-xl items-center justify-center`, { backgroundColor: '#fef3c7', width: HEADER_BUTTON_SIZE, height: HEADER_BUTTON_SIZE }]}
+          >
+            <Feather name="upload-cloud" size={20} color="#d97706" />
+            <View style={{ position: 'absolute', top: 4, right: 4, backgroundColor: '#d97706', borderRadius: 7, minWidth: 14, height: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 }}>
+              <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>{pendingCount}</Text>
+            </View>
+          </TouchableOpacity>
+        )}
         {/* Logout */}
         <TouchableOpacity
           onPress={handleLogout}
@@ -610,6 +849,16 @@ export default function POSScreen() {
           <Feather name="log-out" size={20} color={colors.gray500} />
         </TouchableOpacity>
       </View>
+
+      {/* ── Banner offline / sincronizando ─────────────────────────── */}
+      {(isOffline || isSyncing) && (
+        <View style={[tw`flex-row items-center justify-center px-4 py-2`, { backgroundColor: isSyncing ? `${colors.primary}15` : '#fef3c7', gap: 8 }]}>
+          {isSyncing
+            ? <><ActivityIndicator size="small" color={colors.primary} /><Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>Sincronizando caché…</Text></>
+            : <><Feather name="wifi-off" size={14} color="#d97706" /><Text style={{ color: '#92400e', fontSize: 13, fontWeight: '600' }}>Sin conexión{cacheCount !== null ? ` — ${cacheCount} productos en caché` : ' — modo offline'}</Text></>
+          }
+        </View>
+      )}
 
       {/* ── Search bar ─────────────────────────────────────────────── */}
       <View style={[tw`bg-white px-4 py-3`, { borderBottomWidth: 1, borderBottomColor: colors.gray200 }]}>
@@ -628,6 +877,9 @@ export default function POSScreen() {
             </TouchableOpacity>
           )}
           {searching && <ActivityIndicator size="small" color={colors.primary} />}
+          <TouchableOpacity onPress={openScanner} style={[tw`rounded-xl items-center justify-center`, { width: 40, height: 40, backgroundColor: colors.gray200 }]}>
+            <Feather name="camera" size={18} color={colors.gray500} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -805,36 +1057,150 @@ export default function POSScreen() {
 
             {/* Panel footer */}
             {items.length > 0 && (
-              <View style={[tw`bg-white px-5 py-4`, { borderTopWidth: 1, borderTopColor: colors.gray200 }]}>
+              <View style={[tw`bg-white px-5 pt-4 pb-5`, { borderTopWidth: 1, borderTopColor: colors.gray200 }]}>
+                {/* Active order pill */}
                 {activeOrder && (
                   <View style={[tw`flex-row items-center gap-2 mb-3 px-3 py-2 rounded-xl`, { backgroundColor: `${colors.primary}10` }]}>
                     <Feather name="clipboard" size={14} color={colors.primary} />
-                    <Text style={[tw`font-semibold`, { color: colors.primary, fontSize: 14 }]}>
-                      Comanda #{activeOrder.order_number}{activeOrder.reference ? ` · ${activeOrder.reference}` : ''}
+                    <Text style={[tw`font-semibold flex-1`, { color: colors.primary, fontSize: 13 }]} numberOfLines={1}>
+                      {labels.order} #{activeOrder.order_number}{activeOrder.reference ? ` · ${activeOrder.reference}` : ''}
                     </Text>
+                    {activeOrder.kitchen_ready && (
+                      <View style={[tw`flex-row items-center gap-1 px-2 py-0.5 rounded-full`, { backgroundColor: '#dcfce7' }]}>
+                        <Feather name="check-circle" size={11} color="#16a34a" />
+                        <Text style={{ color: '#16a34a', fontSize: 11, fontWeight: '700' }}>Listo</Text>
+                      </View>
+                    )}
                   </View>
                 )}
+
+                {/* Totals row */}
                 <View style={tw`flex-row items-center justify-between mb-3`}>
-                  <Text style={{ color: colors.gray500, fontSize: 16 }}>{count} ítem{count !== 1 ? 's' : ''}</Text>
-                  <Text style={[tw`font-bold`, { color: colors.primary, fontSize: 32 }]}>{clp(total)}</Text>
+                  <Text style={{ color: colors.gray500, fontSize: 15 }}>{count} ítem{count !== 1 ? 's' : ''}</Text>
+                  <Text style={[tw`font-bold`, { color: colors.primary, fontSize: 30 }]}>{clp(total)}</Text>
                 </View>
+
+                {/* Save-order expanded panel */}
+                {showOrderRef && (
+                  <View style={[tw`mb-3 rounded-2xl border p-3`, { borderColor: '#16a34a' }]}>
+                    {/* Table picker */}
+                    {tables.length > 0 && (
+                      <>
+                        <Text style={[tw`font-semibold mb-2`, { color: colors.gray500, fontSize: 13 }]}>Mesa</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                          <View style={[tw`flex-row`, { gap: 8 }]}>
+                            {/* No-table option */}
+                            <TouchableOpacity
+                              onPress={() => { setSelectedTableId(null); setOrderRef('') }}
+                              style={[
+                                tw`px-3 py-2 rounded-xl border items-center justify-center`,
+                                { minWidth: 60, minHeight: 44 },
+                                selectedTableId === null
+                                  ? { backgroundColor: colors.primary, borderColor: colors.primary }
+                                  : { borderColor: colors.gray200 },
+                              ]}
+                            >
+                              <Text style={{ fontSize: 12, fontWeight: '700', color: selectedTableId === null ? '#fff' : colors.gray500 }}>—</Text>
+                            </TouchableOpacity>
+                            {tables.filter((t) => t.is_active).map((t) => {
+                              const isSel = selectedTableId === t.id
+                              const isBusy = t.status === 'occupied' || t.status === 'bill_requested'
+                              return (
+                                <TouchableOpacity
+                                  key={t.id}
+                                  onPress={() => {
+                                    setSelectedTableId(t.id)
+                                    setOrderRef(t.name)
+                                  }}
+                                  style={[
+                                    tw`px-3 py-2 rounded-xl border items-center justify-center`,
+                                    { minWidth: 60, minHeight: 44 },
+                                    isSel
+                                      ? { backgroundColor: '#16a34a', borderColor: '#16a34a' }
+                                      : isBusy
+                                        ? { backgroundColor: '#fef2f2', borderColor: '#fca5a5' }
+                                        : { backgroundColor: '#f0fdf4', borderColor: '#86efac' },
+                                  ]}
+                                >
+                                  <Text style={{ fontSize: 12, fontWeight: '700', color: isSel ? '#fff' : isBusy ? '#dc2626' : '#16a34a' }} numberOfLines={1}>
+                                    {t.name}
+                                  </Text>
+                                  {isBusy && !isSel && (
+                                    <Text style={{ fontSize: 10, color: '#dc2626' }}>Ocupada</Text>
+                                  )}
+                                </TouchableOpacity>
+                              )
+                            })}
+                          </View>
+                        </ScrollView>
+                      </>
+                    )}
+                    {/* Reference input */}
+                    <Text style={[tw`font-semibold mb-2`, { color: colors.gray500, fontSize: 13 }]}>Referencia (opcional)</Text>
+                    <TextInput
+                      value={orderRef}
+                      onChangeText={(v) => { setOrderRef(v); if (selectedTableId) setSelectedTableId(null) }}
+                      placeholder={`${labels.ref}, Auto, #5…`}
+                      style={[tw`border rounded-xl px-4 text-gray-800 mb-3`, { borderColor: colors.gray200, borderWidth: 1, fontSize: 15, minHeight: ACTION_MIN_HEIGHT }]}
+                    />
+                    <View style={[tw`flex-row`, { gap: 8 }]}>
+                      <TouchableOpacity
+                        onPress={closeSaveOrder}
+                        style={[tw`rounded-xl items-center justify-center border`, { flex: 1, borderColor: colors.gray200, minHeight: 46 }]}
+                      >
+                        <Text style={{ color: colors.gray500, fontSize: 14, fontWeight: '600' }}>Cancelar</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={handleSaveOrder}
+                        disabled={savingOrder}
+                        style={[tw`flex-1 rounded-xl items-center flex-row justify-center gap-2`, { backgroundColor: '#16a34a', minHeight: 46 }]}
+                      >
+                        {savingOrder
+                          ? <ActivityIndicator size="small" color="#fff" />
+                          : <>
+                              <Feather name={activeOrder ? 'refresh-cw' : 'send'} size={16} color="#fff" />
+                              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>
+                                {activeOrder ? 'Actualizar' : 'Enviar a cocina'}
+                              </Text>
+                            </>}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+
+                {/* Primary action row: full-width Cobrar */}
+                <TouchableOpacity
+                  onPress={() => { closeCart(); setTimeout(() => setShowPay(true), 250) }}
+                  style={[tw`rounded-2xl items-center flex-row justify-center mb-2`, { backgroundColor: colors.primary, gap: 10, minHeight: 58 }]}
+                >
+                  <Feather name="credit-card" size={22} color="#fff" />
+                  <Text style={[tw`font-bold text-white`, { fontSize: 20 }]}>
+                    Cobrar {clp(loyaltyDiscount > 0 ? effectiveTotal : total)}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Secondary row: Trash + Guardar comanda */}
                 <View style={[tw`flex-row`, { gap: 8 }]}>
                   <TouchableOpacity
                     onPress={() => Alert.alert('Vaciar carrito', '¿Eliminar todos los productos?', [
                       { text: 'Cancelar', style: 'cancel' },
-                      { text: 'Vaciar', style: 'destructive', onPress: () => { clear(); setActiveOrder(null) } },
+                      { text: 'Vaciar', style: 'destructive', onPress: () => { clear(); setActiveOrder(null); closeSaveOrder() } },
                     ])}
-                    style={[tw`rounded-2xl items-center justify-center border`, { flex: 1, borderColor: colors.gray200, minHeight: 56 }]}
+                    style={[tw`rounded-2xl items-center justify-center border`, { flex: 1, borderColor: colors.gray200, minHeight: 48 }]}
                   >
-                    <Feather name="trash-2" size={20} color={colors.gray400} />
+                    <Feather name="trash-2" size={19} color={colors.gray400} />
                   </TouchableOpacity>
                   <TouchableOpacity
-                    onPress={() => { closeCart(); setTimeout(() => setShowPay(true), 250) }}
-                    style={[tw`rounded-2xl items-center flex-row justify-center`, { flex: 3, backgroundColor: colors.primary, gap: 8, minHeight: 56 }]}
+                    onPress={showOrderRef ? closeSaveOrder : openSaveOrder}
+                    style={[
+                      tw`rounded-2xl items-center flex-row justify-center`,
+                      { flex: 3, borderWidth: 1.5, borderColor: '#16a34a', gap: 8, minHeight: 48,
+                        backgroundColor: showOrderRef ? '#f0fdf4' : 'transparent' },
+                    ]}
                   >
-                    <Feather name="credit-card" size={20} color="#fff" />
-                    <Text style={[tw`font-bold text-white`, { fontSize: 18 }]}>
-                      Cobrar {clp(loyaltyDiscount > 0 ? effectiveTotal : total)}
+                    <Feather name="clipboard" size={17} color="#16a34a" />
+                    <Text style={{ color: '#16a34a', fontSize: 15, fontWeight: '700' }}>
+                      {activeOrder ? `Actualizar ${labels.order.toLowerCase()}` : `Guardar ${labels.order.toLowerCase()}`}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -852,6 +1218,14 @@ export default function POSScreen() {
         onLoadOrder={handleLoadOrder}
         onOrderSaved={handleOrderSaved}
       />
+
+      {receiptSale && (
+        <ReceiptPreviewModal
+          sale={receiptSale}
+          storeName={storeName}
+          onClose={() => setReceiptSale(null)}
+        />
+      )}
 
       {/* ── Payment Modal ───────────────────────────────────────────── */}
       <Modal
@@ -894,6 +1268,12 @@ export default function POSScreen() {
                         {selectedCustomer.points_balance} pts · {selectedCustomer.rut ?? selectedCustomer.phone ?? ''}
                       </Text>
                     </View>
+                    <TouchableOpacity
+                      onPress={() => router.push({ pathname: '/(pos)/customer-detail', params: { id: selectedCustomer.id } })}
+                      style={[tw`rounded-full items-center justify-center mr-1`, { width: 36, height: 36, backgroundColor: `${colors.primary}15` }]}
+                    >
+                      <Feather name="clock" size={16} color={colors.primary} />
+                    </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => { setSelectedCustomer(null); setPointsToRedeem(0); setCustomerQuery('') }}
                       style={[tw`rounded-full items-center justify-center`, { width: 36, height: 36 }]}
@@ -995,7 +1375,7 @@ export default function POSScreen() {
                   <Text style={[tw`font-semibold mb-2`, { color: colors.gray500, fontSize: 16 }]}>Monto efectivo</Text>
                   <TextInput
                     value={cashAmt} onChangeText={setCashAmt} placeholder="0"
-                    keyboardType="numeric" autoFocus={method === 'cash'}
+                    keyboardType="numeric"
                     style={[tw`border rounded-2xl px-4 py-4 font-bold text-gray-800 text-center mb-3`, { borderWidth: 1.5, borderColor: cashNum >= (method === 'cash' ? effectiveTotal : 1) ? colors.primary : colors.gray200, fontSize: 28, minHeight: 60 }]}
                   />
                   <View style={[tw`flex-row flex-wrap mb-3`, { gap: 8 }]}>
@@ -1085,6 +1465,27 @@ export default function POSScreen() {
                 </View>
               )}
 
+              {/* Receipt toggle */}
+              <TouchableOpacity
+                onPress={() => setReceiptOnSale((v) => !v)}
+                activeOpacity={0.7}
+                style={[tw`flex-row items-center justify-between rounded-2xl px-4 py-3 mb-3`, { backgroundColor: receiptOnSale ? `${colors.primary}10` : colors.gray50, borderWidth: 1, borderColor: receiptOnSale ? `${colors.primary}30` : colors.gray200 }]}
+              >
+                <View style={tw`flex-row items-center gap-3`}>
+                  <Feather name="file-text" size={18} color={receiptOnSale ? colors.primary : colors.gray400} />
+                  <View>
+                    <Text style={[tw`font-semibold`, { color: receiptOnSale ? colors.primary : colors.gray500, fontSize: 15 }]}>Emitir boleta</Text>
+                    <Text style={[tw`text-xs`, { color: colors.gray400, fontSize: 12 }]}>Compartir PDF al confirmar</Text>
+                  </View>
+                </View>
+                <Switch
+                  value={receiptOnSale}
+                  onValueChange={setReceiptOnSale}
+                  trackColor={{ false: colors.gray200, true: `${colors.primary}60` }}
+                  thumbColor={receiptOnSale ? colors.primary : '#fff'}
+                />
+              </TouchableOpacity>
+
               {/* Confirm */}
               <TouchableOpacity
                 onPress={handlePay}
@@ -1100,6 +1501,41 @@ export default function POSScreen() {
               </TouchableOpacity>
             </ScrollView>
           </View>
+        </View>
+      </Modal>
+
+      {/* ── Barcode Scanner Modal ──────────────────────────────────────── */}
+      <Modal
+        visible={showScanner}
+        animationType="slide"
+        onRequestClose={() => setShowScanner(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          {cameraPermission?.granted && (
+            <CameraView
+              style={{ flex: 1 }}
+              facing="back"
+              barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'code39', 'qr'] }}
+              onBarcodeScanned={scanned ? undefined : handleBarcodeScan}
+            />
+          )}
+          {/* Viewfinder overlay */}
+          <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]} pointerEvents="none">
+            <View style={{ width: 270, height: 170, borderRadius: 16, borderWidth: 3, borderColor: '#fff', opacity: 0.85 }} />
+            <Text style={{ color: '#fff', marginTop: 16, fontSize: 16, fontWeight: '600', textShadowColor: '#000', textShadowRadius: 4 }}>
+              Apunta al código de barras
+            </Text>
+            {scannerBusy && <ActivityIndicator color="#fff" style={{ marginTop: 12 }} />}
+          </View>
+          {/* Close button */}
+          <SafeAreaView style={{ position: 'absolute', top: 0, left: 0, right: 0 }} pointerEvents="box-none">
+            <TouchableOpacity
+              onPress={() => setShowScanner(false)}
+              style={{ margin: 16, alignSelf: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20, padding: 10 }}
+            >
+              <Feather name="x" size={22} color="#fff" />
+            </TouchableOpacity>
+          </SafeAreaView>
         </View>
       </Modal>
 

@@ -5,15 +5,20 @@ import type { Order } from "@/types";
 
 const POLL_INTERVAL_MS = 8_000;
 
+/** Backend sends naive UTC — append Z so JS parses as UTC. */
+function parseUTC(dateStr: string): Date {
+  return new Date(/Z$|[+-]\d{2}:\d{2}$/.test(dateStr) ? dateStr : `${dateStr}Z`);
+}
+
 function timeElapsed(dateStr: string): string {
-  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  const diff = Math.floor((Date.now() - parseUTC(dateStr).getTime()) / 1000);
   if (diff < 60) return `${diff}s`;
   if (diff < 3600) return `${Math.floor(diff / 60)}min ${diff % 60}s`;
   return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}min`;
 }
 
 function urgencyClass(dateStr: string): string {
-  const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+  const mins = Math.floor((Date.now() - parseUTC(dateStr).getTime()) / 60000);
   if (mins >= 20) return "border-red-500 bg-red-950";
   if (mins >= 10) return "border-yellow-500 bg-yellow-950";
   return "border-green-500 bg-gray-800";
@@ -26,7 +31,7 @@ export default function KitchenDisplayPage() {
   const load = useCallback(async () => {
     try {
       const { data } = await api.get<Order[]>("/orders/", {
-        params: { status: "open", limit: 30 },
+        params: { status: "open", kitchen_ready: false, limit: 30 },
       });
       // Sort: bill_requested first, then oldest first
       const sorted = [...data].sort((a, b) => {
@@ -49,7 +54,7 @@ export default function KitchenDisplayPage() {
 
   const handleDone = async (orderId: string) => {
     try {
-      await api.post(`/orders/${orderId}/cancel`);
+      await api.patch(`/orders/${orderId}`, { kitchen_ready: true });
       setOrders((prev) => prev.filter((o) => o.id !== orderId));
     } catch {
       // silent

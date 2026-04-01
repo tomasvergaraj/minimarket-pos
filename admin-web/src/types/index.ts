@@ -265,10 +265,13 @@ export interface PaymentMethodPoint {
   count: number
 }
 
+export type BusinessType = 'minimarket' | 'restaurant' | 'foodtruck' | 'cafeteria' | 'botilleria' | 'farmacia' | 'otro'
+
 export interface StoreConfig {
   store_name: string
   store_rut: string
   store_address: string
+  business_type: BusinessType
   smtp_configured?: boolean
 }
 

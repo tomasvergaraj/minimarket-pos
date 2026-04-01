@@ -1,4 +1,4 @@
-e# Plan: App Móvil POS — React Native
+# Plan: App Móvil POS — React Native
 
 ## Contexto
 
@@ -103,153 +103,165 @@ mobile-pos/
 
 ## Fases de implementación
 
-### Fase 1 — Scaffold y autenticación
+### Fase 1 — Scaffold y autenticación ✅
 **Objetivo:** App corriendo en dispositivo físico/emulador con login funcional.
 
-- [ ] 1.1 Crear proyecto: `npx create-expo-app mobile-pos --template expo-template-blank-typescript`
-- [ ] 1.2 Instalar dependencias base (ver sección Dependencias)
-- [ ] 1.3 Configurar NativeWind (tailwind.config.js + babel.config.js)
-- [ ] 1.4 Implementar cliente Axios (`src/api/client.ts`)
-  - `baseURL` configurable (IP del servidor en red local)
+- [x] 1.1 Proyecto creado con Expo SDK 55 + TypeScript
+- [x] 1.2 Dependencias instaladas (Axios, Zustand, TanStack Query, NativeWind, AsyncStorage, NetInfo, etc.)
+- [x] 1.3 NativeWind configurado (`tailwind.config.js` + `babel.config.js` + `metro.config.js`)
+- [x] 1.4 Cliente Axios (`src/api/client.ts`)
+  - `baseURL` configurable vía Storage (`server_url`)
   - Interceptor request: adjunta `Authorization: Bearer <access_token>`
-  - Interceptor response: refresca token en 401 (mismo patrón que `admin-web/src/lib/api.ts`)
-- [ ] 1.5 `authStore.ts` con Zustand + MMKV (persistir tokens entre cierres)
-- [ ] 1.6 Pantalla Login PIN (`app/(auth)/index.tsx`)
-  - Teclado numérico on-screen (4 dígitos)
+  - Interceptor response: refresca token en 401 con cola de requests concurrentes
+- [x] 1.5 `authStore.ts` con Zustand + AsyncStorage (persistir tokens entre cierres)
+- [x] 1.6 Pantalla Login PIN (`app/(auth)/login.tsx`)
+  - Teclado numérico on-screen (6 dígitos) con componente `PinPad`
   - Llamada a `POST /api/users/login/pin`
   - Redirección a POS si rol = cashier | admin
-- [ ] 1.7 Auth guard en root layout (redirige a login si no hay token)
-- [ ] 1.8 Configurar URL del servidor (pantalla de ajustes o variable de entorno)
+- [x] 1.7 Auth guard en root layout (redirige a login si no hay token)
+- [x] 1.8 URL del servidor configurable en login + pantalla Ajustes
 
-**Entregable:** Login con PIN → pantalla vacía del POS.
+**Entregable:** Login con PIN → pantalla vacía del POS. ✅
 
 ---
 
-### Fase 2 — Pantalla POS principal (carrito)
+### Fase 2 — Pantalla POS principal (carrito) ✅
 **Objetivo:** Flujo completo de venta: buscar producto → agregar → cobrar.
 
-- [ ] 2.1 `cartStore.ts` — estado del carrito (igual que Electron `cartStore`)
-  - `items: CartItem[]`, `addItem`, `removeItem`, `updateQty`, `clear`
-  - `total`, `subtotal`, `taxAmount` calculados (mismo math que `sale_service.py`)
-- [ ] 2.2 Layout de tabs POS (`app/(pos)/_layout.tsx`)
-  - Tab 1: Carrito activo
-  - Tab 2: Búsqueda productos
-  - Tab 3: Comandas/mesas (si aplica)
-- [ ] 2.3 Componente `ProductCard` (imagen, nombre, precio, stock)
-- [ ] 2.4 Búsqueda de productos (`app/(pos)/search.tsx`)
-  - Input con debounce → `GET /api/products/?search=`
-  - Scroll infinito (TanStack Query `useInfiniteQuery`)
-  - Tap → agrega al carrito
-- [ ] 2.5 Escáner de código de barras (`src/hooks/useBarcode.ts`)
-  - `expo-camera` con `onBarcodeScanned`
-  - Busca producto por barcode → `GET /api/products/?barcode=`
-  - Auto-agrega al carrito si hay resultado único
-- [ ] 2.6 Carrito (`app/(pos)/index.tsx`)
-  - Lista de ítems con cantidad editable
-  - Swipe-to-delete por ítem
-  - Totales (subtotal, IVA, total)
-  - Botón **Cobrar**
-- [ ] 2.7 Modal de cobro (`components/pos/PaymentModal.tsx`)
+- [x] 2.1 `cartStore.ts` — estado del carrito
+  - `items`, `addItem`, `removeItem`, `updateQty`, `updatePrice`, `clear`
+  - `cartTotal` y `cartCount` calculados; validación de stock en `addItem`/`updateQty`
+- [x] 2.2 Layout de tabs POS (`app/(pos)/_layout.tsx`)
+  - Tabs: Venta · Historial · Inventario · Caja · Ajustes (badge carrito en Venta)
+- [x] 2.3 Tarjetas de producto renderizadas inline en búsqueda y panel de carrito
+  - Nombre, SKU, precio, descuento, stock, badges "Sin stock" / "Solo quedan N"
+- [x] 2.4 Búsqueda de productos (`app/(pos)/search.tsx` + inline en `index.tsx`)
+  - Debounce 350 ms → `GET /api/products/?search=` · Tap agrega al carrito
+- [x] 2.5 Escáner de código de barras (modal con `CameraView` en `app/(pos)/index.tsx`)
+  - `expo-camera` con `onBarcodeScanned` + `barcodeScannerSettings`
+  - Busca por barcode → `GET /api/products/barcode/{barcode}` (fallback offline)
+  - Auto-agrega al carrito; si no existe muestra alerta con opción re-escanear
+- [x] 2.6 Carrito panel deslizable (`app/(pos)/index.tsx`)
+  - Lista ítems con +/− cantidad, eliminación al llegar a 0, editor de descuento %/fijo
+  - Totales (subtotal, IVA, total) · Botón **Cobrar** · *(sin swipe gesture — eliminación vía botón −)*
+- [x] 2.7 Modal de cobro (inline en `app/(pos)/index.tsx`)
   - Selector método: Efectivo / Tarjeta / Transferencia / Mixto
-  - Input monto recibido → calcula vuelto
-  - Botón confirmar → `POST /api/sales/`
-  - Muestra resumen de boleta tras éxito
-  - Vacía carrito
+  - Input monto → calcula vuelto · Accesos rápidos $1k–$50k
+  - Botón confirmar → `POST /api/sales/` · Toggle "Emitir boleta"
+  - Resumen vuelto + puntos ganados/canjeados · Vacía carrito · Grid de favoritos
 
-**Entregable:** Venta completa desde búsqueda hasta boleta.
+**Entregable:** Venta completa desde búsqueda hasta boleta. ✅
 
 ---
 
-### Fase 3 — Gestión de caja
+### Fase 3 — Gestión de caja ✅
 **Objetivo:** Abrir y cerrar turno desde el móvil.
 
-- [ ] 3.1 `sessionStore.ts` — persiste `cash_session_id` y `register_id` activos (MMKV)
-- [ ] 3.2 Pantalla apertura de caja (`app/(admin)/cash.tsx`)
+- [x] 3.1 `cashStore.ts` — persiste `cash_session` y `cash_register` en AsyncStorage
+- [x] 3.2 Pantalla apertura de caja (`app/(pos)/cash.tsx`)
   - Selección de caja registradora (`GET /api/cash/registers`)
-  - Input monto de apertura
-  - `POST /api/cash/sessions/open`
-  - Guarda session en store
-- [ ] 3.3 Guardia en POS: si no hay sesión abierta, redirige a apertura
-- [ ] 3.4 Pantalla cierre de caja
-  - Resumen: ventas efectivo, tarjeta, transferencia
-  - Input conteo físico de efectivo
-  - Diferencia calculada (esperado vs contado)
+  - Input monto de apertura · `POST /api/cash/sessions/open`
+  - Detecta sesiones activas de otros terminales y permite unirse
+- [x] 3.3 Guardia en POS: si no hay sesión abierta muestra pantalla "Sin sesión de caja" con botón Ir a Caja
+- [x] 3.4 Pantalla cierre de caja (en `app/(pos)/cash.tsx`)
+  - Dashboard resumen: ventas efectivo, tarjeta, transferencia, conteo
+  - Input conteo físico · Diferencia calculada (esperado vs contado) con color
   - `POST /api/cash/sessions/{id}/close`
-- [ ] 3.5 Indicador visual de sesión activa (header/top bar)
+- [x] 3.5 Indicador sesión activa en header del POS (nombre de caja, comanda activa)
+  - Polling cada 12 s para detectar cierre remoto
 
-**Entregable:** Flujo completo apertura → ventas → cierre de caja.
+**Entregable:** Flujo completo apertura → ventas → cierre de caja. ✅
 
 ---
 
-### Fase 4 — Clientes y fidelización
+### Fase 4 — Clientes y fidelización ✅
 **Objetivo:** Asociar cliente a venta y gestionar puntos.
 
-- [ ] 4.1 Buscador de clientes en PaymentModal
-  - Input nombre/RUT → `GET /api/customers/?search=`
-  - Muestra puntos disponibles del cliente
-- [ ] 4.2 Canje de puntos en cobro
-  - Slider/input de puntos a canjear
-  - Recalcula total con descuento
-  - Envía `points_to_redeem` en `POST /api/sales/`
-- [ ] 4.3 Pantalla historial del cliente (`app/(admin)/customers/[id].tsx`)
-  - Balance puntos, total compras, última visita
-  - `GET /api/customers/{id}/history`
+- [x] 4.1 Buscador de clientes en modal de cobro
+  - Input nombre/RUT/teléfono → `GET /api/customers/search` con debounce
+  - Muestra nombre, RUT/teléfono y puntos disponibles del cliente seleccionado
+- [x] 4.2 Canje de puntos en cobro
+  - Input numérico de puntos + botones "Todos" / "Limpiar"
+  - Recalcula total con descuento en tiempo real (`loyaltyDiscount`)
+  - Envía `points_to_redeem` en `POST /api/sales/`; muestra puntos ganados/canjeados al confirmar
+- [x] 4.3 Pantalla historial del cliente (`app/(pos)/customer-detail.tsx`)
+  - Stats: balance de puntos, visitas, total compras
+  - Datos de contacto: RUT, teléfono, email
+  - Admin: panel ajuste de puntos (+/− con input y toggle)
+  - Historial de compras expandible con ítems, subtotal, descuento, total
+  - `GET /api/customers/{id}` + `GET /api/customers/{id}/history`
+  - Accesible desde modal de cobro (botón reloj en tarjeta cliente)
 
-**Entregable:** Ventas con cliente asociado y canje de puntos.
+**Entregable:** Ventas con cliente asociado y canje de puntos. ✅
 
 ---
 
-### Fase 5 — Historial de ventas y recibos
+### Fase 5 — Historial de ventas y recibos ✅ (parcial)
 **Objetivo:** Consultar ventas del día y descargar/imprimir boleta.
 
-- [ ] 5.1 Pantalla historial ventas (`app/(admin)/sales.tsx`)
-  - Lista paginada `GET /api/sales/`
-  - Filtro por fecha, método de pago
-  - Badge estado (completada / anulada)
-- [ ] 5.2 Detalle de venta
-  - Ítems, totales, método de pago, cliente
-  - Botón **Anular** (con confirmación) → `POST /api/sales/{id}/void`
-- [ ] 5.3 Descarga de recibo PDF
-  - `GET /api/sales/{id}/receipt.pdf` con auth header
-  - Abre con `expo-sharing` o `expo-print`
-- [ ] 5.4 Impresión Bluetooth (opcional)
-  - `react-native-thermal-printer` → impresora térmica BT/WiFi
-  - Formato ticket 80mm (mismo que PDF service)
+- [x] 5.1 Pantalla historial ventas (`app/(pos)/sales.tsx`)
+  - Lista paginada `GET /api/sales/` con pull-to-refresh
+  - Filtro por rango de fecha (hoy / semana / todo) y estado (completada / anulada)
+  - Muestra método de pago, hora, total, conteo de ítems
+- [x] 5.2 Detalle de venta (modal deslizable)
+  - Ítems, subtotal, IVA, descuento, total, método de pago, cliente asociado
+  - Botón **Anular** (con confirmación, solo admin) → `POST /api/sales/{id}/void`
+  - Botón **Descargar boleta** → descarga y comparte PDF
+- [x] 5.3 Boleta PDF (`src/api/sales.ts` → `downloadReceipt`)
+  - `GET /api/sales/{id}/receipt.pdf` con header JWT
+  - Descarga a caché local y comparte vía `expo-sharing`
+  - Toggle por venta en modal de cobro ("Emitir boleta")
+  - Toggle global en Ajustes con descripción contextual
+- [x] 5.4 Impresión Bluetooth (`src/services/printer.ts` + `src/stores/printerStore.ts`)
+  - `react-native-thermal-printer` v3 vía NativeModules (no rompe el bundle si no está instalado)
+  - `printSale(sale, macAddress, storeName)` con formato ESC/POS completo (ítems, totales, pago, puntos)
+  - Botón "Imprimir" en detalle de venta (`sales.tsx`)
+  - Auto-impresión post-venta configurable (`index.tsx`) junto con la boleta PDF
+  - Sección "Impresora Bluetooth" en Ajustes: selector de dispositivo, nombre del negocio, toggle auto-print
+  - Graceful degradation: muestra aviso si módulo nativo no está compilado
+  - Requiere: `npm install react-native-thermal-printer` + `eas build`
 
-**Entregable:** Consulta de ventas + boleta PDF descargable.
+**Entregable:** Consulta de ventas + boleta PDF descargable. ✅
 
 ---
 
-### Fase 6 — Consulta de productos e inventario
+### Fase 6 — Consulta de productos e inventario ✅
 **Objetivo:** Ver stock y editar precio desde el móvil (rol admin).
 
-- [ ] 6.1 Pantalla productos (`app/(admin)/products.tsx`)
-  - Lista con stock, precio, estado
-  - Alerta visual stock bajo (`stock <= min_stock`)
-- [ ] 6.2 Detalle producto con edición rápida de precio/stock (solo admin)
-  - `PUT /api/products/{id}`
-- [ ] 6.3 Ajuste de stock manual
-  - Input cantidad + motivo → `POST /api/kardex/`
+- [x] 6.1 Pantalla productos (`app/(pos)/products.tsx`)
+  - Lista con búsqueda, debounce 350 ms, pull-to-refresh
+  - Badges de stock: rojo "Sin stock" / naranja "Stock bajo" (`stock <= min_stock`)
+  - Filtro toggle "Solo stock bajo"
+- [x] 6.2 Edición rápida de precio (solo admin) en modal de detalle
+  - Input precio de venta + `PUT /api/products/{id}`
+- [x] 6.3 Ajuste de stock manual (solo admin)
+  - Tipos: Entrada / Ajuste / Merma con ícono y color
+  - Input cantidad + notas → `POST /api/kardex/`; muestra stock antes/después
 
-**Entregable:** Gestión básica de inventario desde el móvil.
+**Entregable:** Gestión básica de inventario desde el móvil. ✅
 
 ---
 
 ### Fase 7 — Offline básico y configuración
 **Objetivo:** App usable aunque la red local falle momentáneamente.
 
-- [ ] 7.1 Cache de productos en SQLite (`expo-sqlite`)
-  - Sincronizar catálogo completo al abrir sesión
-  - Búsqueda offline contra SQLite si API no responde
-- [ ] 7.2 Cola de ventas pendientes
-  - Si `POST /api/sales/` falla por red → guardar en SQLite
-  - Reintentar automáticamente al recuperar conexión
-  - Indicador visual de ventas pendientes de sincronizar
-- [ ] 7.3 Pantalla de configuración
-  - URL del servidor (IP o dominio)
-  - Test de conexión
-  - Versión de la app
-- [ ] 7.4 Detección de conectividad (`@react-native-community/netinfo`)
+- [x] 7.1 Cache de productos en AsyncStorage (`src/db/productCache.ts`)
+  - Sincroniza catálogo completo al abrir sesión (`syncProductCache`, paginado de 500)
+  - Búsqueda offline contra caché si API no responde (`searchOffline`, `getByBarcodeOffline`)
+  - Fallback transparente en `searchProducts` y `getByBarcode`
+  - Gestión desde Ajustes: ver conteo/fecha, forzar sync, limpiar
+- [x] 7.2 Cola de ventas pendientes (`src/db/saleQueue.ts`)
+  - Si `POST /api/sales/` falla por red → `enqueue()` y alerta al cajero
+  - `flushQueue()` al detectar reconexión via NetInfo (auto-retry)
+  - Badge `upload-cloud` con conteo en header del POS
+  - Banner offline con conteo de productos en caché
+  - Gestión desde Ajustes: ver conteo, limpiar cola
+- [x] 7.3 Pantalla de configuración (`app/(pos)/settings.tsx`)
+  - URL del servidor (IP o dominio) + guardar
+  - Test de conexión al servidor
+  - Versión de la app (expo-constants)
+  - Indicador de conectividad en tiempo real
+- [x] 7.4 Detección de conectividad (`@react-native-community/netinfo`) — en Settings y en tiempo real
 
 **Entregable:** App funcional con red local, resiliente a cortes cortos.
 
@@ -258,52 +270,60 @@ mobile-pos/
 ### Fase 8 — Build y distribución
 **Objetivo:** APK listo para instalar en dispositivos Android.
 
-- [ ] 8.1 Configurar `app.json` (nombre, ícono, splash screen, permisos cámara/BT)
-- [ ] 8.2 Build APK con EAS Build (`eas build --platform android --profile preview`)
-  - Profile `preview`: APK directo sin Play Store
-  - Profile `production`: AAB para Play Store (futuro)
-- [ ] 8.3 Instalar en dispositivos de prueba via ADB o QR code
-- [ ] 8.4 Ajuste de permisos Android (cámara, Bluetooth, red local)
-- [ ] 8.5 Probar en dispositivo físico Android con impresora BT
+- [x] 8.1 Configurar `app.json`
+  - Nombre "Nexo POS", package `com.nexo.pos`, scheme `nexopos`
+  - Íconos adaptativos, splash screen, orientación portrait
+  - Permisos declarados: CAMERA, INTERNET, ACCESS_NETWORK_STATE, BLUETOOTH (×4)
+- [x] 8.4 Permisos Android configurados en `app.json` (cámara, Bluetooth, red)
+- [x] 8.2 `eas.json` configurado con perfiles preview (APK) y production (AAB)
+  - `eas build --platform android --profile preview` → APK directo
+  - `eas build --platform android --profile production` → AAB Play Store
+  - *(ejecutar requiere cuenta EAS y `eas-cli` instalado globalmente)*
+- [ ] 8.3 Instalar en dispositivos de prueba via ADB o QR code *(pendiente — hardware)*
+- [ ] 8.5 Probar en dispositivo físico Android con impresora BT *(pendiente — hardware)*
 
 **Entregable:** APK instalable en Android, probado en hardware real.
 
 ---
 
-## Dependencias principales
+## Dependencias instaladas (reales)
 
 ```json
 {
   "dependencies": {
-    "expo": "~53.0.0",
-    "expo-router": "~4.0.0",
-    "react-native": "0.79.x",
-    "axios": "^1.7.0",
-    "zustand": "^5.0.0",
-    "@tanstack/react-query": "^5.0.0",
-    "nativewind": "^4.0.0",
-    "tailwindcss": "^3.4.0",
-    "react-native-mmkv": "^3.0.0",
-    "expo-sqlite": "~15.0.0",
-    "expo-camera": "~16.0.0",
-    "expo-barcode-scanner": "~13.0.0",
-    "expo-sharing": "~12.0.0",
-    "expo-file-system": "~18.0.0",
-    "@react-native-community/netinfo": "^11.0.0",
-    "react-hook-form": "^7.0.0",
-    "zod": "^3.0.0",
-    "@expo/vector-icons": "^14.0.0",
-    "react-native-gesture-handler": "~2.20.0",
-    "react-native-reanimated": "~3.16.0",
-    "react-native-safe-area-context": "4.14.x"
+    "expo": "~55.0.8",
+    "expo-router": "~55.0.7",
+    "react": "19.2.0",
+    "react-native": "0.83.2",
+    "axios": "^1.13.6",
+    "zustand": "^5.0.12",
+    "@tanstack/react-query": "^5.95.2",
+    "twrnc": "^4.16.0",
+    "tailwindcss": "^3.3.5",
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "expo-camera": "~55.0.11",
+    "expo-barcode-scanner": "^13.0.1",
+    "expo-sharing": "~55.0.14",
+    "expo-file-system": "~55.0.11",
+    "expo-constants": "~55.0.9",
+    "expo-linear-gradient": "~55.0.9",
+    "@react-native-community/netinfo": "11.5.2",
+    "react-hook-form": "^7.72.0",
+    "zod": "^4.3.6",
+    "@expo/vector-icons": "^15.1.1",
+    "react-native-gesture-handler": "~2.30.0",
+    "react-native-reanimated": "4.2.1",
+    "react-native-safe-area-context": "~5.6.2",
+    "react-native-screens": "~4.23.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.0.0",
-    "typescript": "~5.3.0",
-    "eas-cli": "latest"
+    "typescript": "~5.9.2",
+    "babel-preset-expo": "^55.0.12"
   }
 }
 ```
+
+> **Nota:** Se usa `AsyncStorage` en lugar de `MMKV` (no instalado) y `twrnc` en lugar de `NativeWind` completo.
 
 ---
 
@@ -436,15 +456,15 @@ Las fases 4-7 son mejoras progresivas sobre ese núcleo.
 
 ---
 
-## Estimación de trabajo
+## Estado de implementación
 
-| Fase | Complejidad | Prioridad |
+| Fase | Estado | Pendiente |
 |---|---|---|
-| 1 — Auth | Baja | MVP |
-| 2 — POS carrito | Alta | MVP |
-| 3 — Caja | Media | MVP |
-| 4 — Clientes/puntos | Media | Post-MVP |
-| 5 — Historial/recibos | Baja | Post-MVP |
-| 6 — Inventario | Baja | Post-MVP |
-| 7 — Offline | Alta | Post-MVP |
-| 8 — Build APK | Baja | MVP |
+| 1 — Auth | ✅ Completo | — |
+| 2 — POS carrito | ✅ Completo | Swipe-to-delete (opcional) |
+| 3 — Caja | ✅ Completo | — |
+| 4 — Clientes/puntos | ✅ Completo | — |
+| 5 — Historial/recibos | ✅ Completo | — |
+| 6 — Inventario | ✅ Completo | — |
+| 7 — Offline | ✅ Completo | — |
+| 8 — Build APK | 🔧 Parcial | Ejecutar EAS Build + prueba en hardware |

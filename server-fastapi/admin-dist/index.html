@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/admin/icon.svg" />
+    <link rel="manifest" href="/admin/manifest.json" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#4f46e5" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Nexo Admin" />
+    <script>
+      ;(() => {
+        try {
+          const stored = localStorage.getItem('admin_server_url')
+          if (!stored) return
+
+          const storedUrl = new URL(stored, window.location.origin)
+          const currentUrl = new URL(window.location.origin)
+          const loopbackHosts = new Set(['localhost', '127.0.0.1'])
+
+          if (
+            window.location.pathname.startsWith('/admin') &&
+            loopbackHosts.has(storedUrl.hostname) &&
+            loopbackHosts.has(currentUrl.hostname) &&
+            storedUrl.origin !== currentUrl.origin
+          ) {
+            localStorage.removeItem('admin_server_url')
+          }
+        } catch {}
+      })()
+    </script>
+    <title>Nexo Admin</title>
+    <script type="module" crossorigin src="/admin/assets/index-ChrXXgN3.js"></script>
+    <link rel="stylesheet" crossorigin href="/admin/assets/index-CAhuyp-9.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/admin/sw.js', { scope: '/admin/' })
+        })
+      }
+    </script>
+  </body>
+</html>

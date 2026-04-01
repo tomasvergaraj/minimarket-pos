@@ -84,6 +84,7 @@ def get_order_by_number(order_number: int, db: Session = Depends(get_db)):
 def list_orders(
     status: str | None = Query(default=None),
     register_id: str | None = Query(default=None),
+    kitchen_ready: bool | None = Query(default=None),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
@@ -93,6 +94,8 @@ def list_orders(
         q = q.filter(Order.status == status)
     if register_id:
         q = q.filter(Order.register_id == register_id)
+    if kitchen_ready is not None:
+        q = q.filter(Order.kitchen_ready == kitchen_ready)
     return q.order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
 
 
@@ -130,6 +133,8 @@ def patch_order(order_id: str, data: OrderPatch, db: Session = Depends(get_db)):
         order.table_id = data.table_id
     if data.bill_requested is not None:
         order.bill_requested = data.bill_requested
+    if data.kitchen_ready is not None:
+        order.kitchen_ready = data.kitchen_ready
     order.updated_at = datetime.utcnow()
 
     db.commit()

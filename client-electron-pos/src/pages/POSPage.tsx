@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
+  Bell,
   ChefHat,
   ClipboardList,
   Gift,
@@ -135,6 +136,16 @@ function DiscountEditor({
   );
 }
 
+function orderLabel(businessType: string) {
+  if (businessType === "restaurant" || businessType === "cafeteria" || businessType === "foodtruck") {
+    return { order: "Comanda", orders: "Comandas", ref: "Mesa / Referencia" };
+  }
+  if (businessType === "botilleria") {
+    return { order: "Pedido", orders: "Pedidos", ref: "Referencia" };
+  }
+  return { order: "Comanda", orders: "Comandas", ref: "Referencia" };
+}
+
 export default function POSPage() {
   const { user, register } = useAuthStore();
   const { items, addItem, removeItem, updateQuantity, updatePrice, clear, total } = useCartStore();
@@ -163,6 +174,8 @@ export default function POSPage() {
   const [savingOrder, setSavingOrder] = useState(false);
   const [customerDisplayOpen, setCustomerDisplayOpen] = useState(false);
   const [kitchenDisplayOpen, setKitchenDisplayOpen] = useState(false);
+  const [kitchenReadyCount, setKitchenReadyCount] = useState(0);
+  const [businessType, setBusinessType] = useState("minimarket");
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [promoLabels, setPromoLabels] = useState<Record<string, string | null>>({});
 
@@ -206,6 +219,28 @@ export default function POSPage() {
     api.get("/customers/loyalty-config")
       .then(({ data }) => setLoyaltyConfig(data))
       .catch(() => {});
+  }, []);
+
+  // Fetch business type on mount
+  useEffect(() => {
+    api.get("/config")
+      .then(({ data }) => { if (data.business_type) setBusinessType(data.business_type); })
+      .catch(() => {});
+  }, []);
+
+  // Poll kitchen-ready orders every 15s
+  useEffect(() => {
+    const poll = () => {
+      api.get<Order[]>("/orders/", { params: { status: "open", limit: 50 } })
+        .then(({ data }) => {
+          const list = Array.isArray(data) ? data : (data as { data?: Order[] }).data ?? [];
+          setKitchenReadyCount(list.filter((o) => o.kitchen_ready).length);
+        })
+        .catch(() => {});
+    };
+    poll();
+    const id = window.setInterval(poll, 15_000);
+    return () => window.clearInterval(id);
   }, []);
 
   const applyPromoToItem = useCallback((product: Product, qty: number, cartKey: string) => {
@@ -482,11 +517,11 @@ export default function POSPage() {
           notes: payload.notes,
         });
         savedOrder = data;
-        toast.success(`Comanda #${savedOrder.order_number} actualizada`);
+        toast.success(`${labels.order} #${savedOrder.order_number} actualizada`);
       } else {
         const { data } = await api.post<Order>("/orders/", payload);
         savedOrder = data;
-        toast.success(`Comanda #${savedOrder.order_number} guardada`);
+        toast.success(`${labels.order} #${savedOrder.order_number} guardada`);
       }
 
       setActiveOrder(savedOrder);
@@ -495,7 +530,7 @@ export default function POSPage() {
       setShowOrderRef(false);
       setPreviewOrder(savedOrder);
     } catch {
-      toast.error("Error guardando comanda");
+      toast.error(`Error guardando ${labels.order.toLowerCase()}`);
     } finally {
       setSavingOrder(false);
     }
@@ -519,6 +554,7 @@ export default function POSPage() {
   const effectiveTotal = Math.max(0, total() - loyaltyDiscount);
 
   const showFavorites = searchResults.length === 0;
+  const labels = orderLabel(businessType);
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">
@@ -566,9 +602,20 @@ export default function POSPage() {
           </button>
           <button
             onClick={() => setShowOrders(true)}
-            className="flex items-center gap-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg transition"
+            className={`relative flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg transition ${
+              kitchenReadyCount > 0
+                ? "bg-green-100 text-green-700 hover:bg-green-200"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
           >
-            <ClipboardList size={16} /> Comandas
+            <ClipboardList size={16} />
+            {labels.orders}
+            {kitchenReadyCount > 0 && (
+              <span className="flex items-center gap-0.5 ml-1 bg-green-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                <Bell size={9} />
+                {kitchenReadyCount}
+              </span>
+            )}
           </button>
           <button onClick={() => navigate("/settings")} className="p-2 text-gray-400 hover:text-gray-600">
             <Settings size={20} />
@@ -701,13 +748,18 @@ export default function POSPage() {
 
         <div className="w-[420px] bg-white border-l flex flex-col">
           {activeOrder && (
-            <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-blue-700">
+            <div className={`border-b px-4 py-2 flex items-center justify-between ${activeOrder.kitchen_ready ? "bg-green-50 border-green-300" : "bg-blue-50 border-blue-200"}`}>
+              <div className={`flex items-center gap-2 text-sm ${activeOrder.kitchen_ready ? "text-green-700" : "text-blue-700"}`}>
                 <ClipboardList size={14} />
-                <span className="font-semibold">Comanda #{activeOrder.order_number}</span>
+                <span className="font-semibold">{labels.order} #{activeOrder.order_number}</span>
                 {activeOrder.reference && (
-                  <span className="bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full text-xs">
+                  <span className={`px-2 py-0.5 rounded-full text-xs ${activeOrder.kitchen_ready ? "bg-green-200 text-green-800" : "bg-blue-200 text-blue-800"}`}>
                     {activeOrder.reference}
+                  </span>
+                )}
+                {activeOrder.kitchen_ready && (
+                  <span className="flex items-center gap-1 bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    <Bell size={9} /> Listo
                   </span>
                 )}
               </div>
@@ -715,14 +767,14 @@ export default function POSPage() {
                 <button
                   onClick={handleReprintOrder}
                   className="text-blue-500 hover:text-blue-700 p-1"
-                  title="Ver comanda"
+                  title={`Ver ${labels.order.toLowerCase()}`}
                 >
                   <Printer size={14} />
                 </button>
                 <button
                   onClick={handleClearActiveOrder}
                   className="text-blue-400 hover:text-blue-600 p-1"
-                  title="Descartar comanda"
+                  title={`Descartar ${labels.order.toLowerCase()}`}
                 >
                   <X size={14} />
                 </button>
@@ -994,7 +1046,7 @@ export default function POSPage() {
                       disabled={savingOrder || items.length === 0}
                       className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap"
                     >
-                      {savingOrder ? "..." : "Guardar Comanda"}
+                      {savingOrder ? "..." : `Guardar ${labels.order}`}
                     </button>
                   </div>
                 </div>
@@ -1009,7 +1061,7 @@ export default function POSPage() {
                 className="w-full flex items-center justify-center gap-2 border-2 border-blue-300 hover:border-blue-500 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed text-blue-700 py-2 rounded-xl text-sm font-medium transition"
               >
                 <Save size={15} />
-                {activeOrder ? `Actualizar Comanda #${activeOrder.order_number}` : "Generar Comanda"}
+                {activeOrder ? `Actualizar ${labels.order} #${activeOrder.order_number}` : `Generar ${labels.order}`}
               </button>
             )}
 

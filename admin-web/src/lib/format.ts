@@ -14,7 +14,7 @@ export function formatNumber(n: number): string {
 
 // Backend emits naive UTC datetimes (no timezone suffix).
 // Appending 'Z' ensures the browser treats them as UTC, then converts to local time.
-function parseUTC(iso: string): Date {
+export function parseUTC(iso: string): Date {
   if (iso && !iso.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(iso)) {
     return new Date(iso + 'Z')
   }

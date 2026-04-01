@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     STORE_NAME: str = "Nexo"
     STORE_RUT: str = ""
     STORE_ADDRESS: str = ""
+    BUSINESS_TYPE: str = "minimarket"  # minimarket | restaurant | foodtruck | cafeteria | botilleria | farmacia | otro
     CORS_ORIGINS: str = (
         "http://localhost:5174,"
         "http://127.0.0.1:5174,"

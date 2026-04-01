@@ -66,6 +66,14 @@ export default function PosLayout() {
         }}
       />
       <Tabs.Screen name="search" options={{ href: null }} />
+      <Tabs.Screen name="customer-detail" options={{ href: null }} />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Ajustes',
+          tabBarIcon: ({ color }) => <Feather name="settings" size={25} color={color} />,
+        }}
+      />
     </Tabs>
   )
 }

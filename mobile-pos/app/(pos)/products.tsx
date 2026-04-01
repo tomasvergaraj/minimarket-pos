@@ -171,7 +171,7 @@ export default function ProductsScreen() {
             <Text style={[tw`text-xs mt-0.5`, { color: colors.gray400 }]}>Stock: {p.stock}</Text>
           )}
         </View>
-        {isAdmin && <Feather name="chevron-right" size={14} color={colors.gray300} style={{ marginLeft: 8 }} />}
+        {isAdmin && <Feather name="chevron-right" size={14} color={colors.gray200} style={{ marginLeft: 8 }} />}
       </TouchableOpacity>
     )
   }
@@ -320,7 +320,7 @@ export default function ProductsScreen() {
                 {isAdmin ? (
                   <>
                     {/* ── Edit price ── */}
-                    <Text style={[tw`font-bold mb-3`, { color: colors.gray700, fontSize: 15 }]}>
+                    <Text style={[tw`font-bold mb-3`, { color: colors.gray800, fontSize: 15 }]}>
                       Actualizar precio de venta
                     </Text>
                     <View style={[tw`flex-row gap-2 mb-5`]}>
@@ -350,7 +350,7 @@ export default function ProductsScreen() {
                     </View>
 
                     {/* ── Stock adjustment ── */}
-                    <Text style={[tw`font-bold mb-3`, { color: colors.gray700, fontSize: 15 }]}>
+                    <Text style={[tw`font-bold mb-3`, { color: colors.gray800, fontSize: 15 }]}>
                       Ajuste de stock
                     </Text>
 
@@ -421,7 +421,7 @@ export default function ProductsScreen() {
                   </>
                 ) : (
                   <View style={[tw`rounded-2xl p-5 items-center`, { backgroundColor: colors.gray50 }]}>
-                    <Feather name="lock" size={28} color={colors.gray300} />
+                    <Feather name="lock" size={28} color={colors.gray200} />
                     <Text style={[tw`text-sm mt-3 text-center font-semibold`, { color: colors.gray400 }]}>
                       Solo administradores pueden editar productos
                     </Text>

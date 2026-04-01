@@ -3,7 +3,8 @@ import { isLicenseErrorCode, normalizeLicenseCode } from "@/lib/license";
 import { useLicenseStore } from "@/stores/licenseStore";
 
 const SERVER_URL = localStorage.getItem("server_url") || "http://localhost:8001";
-let authToken = "";
+// Persisted so secondary windows (KDS, customer display) pick it up on load.
+let authToken = localStorage.getItem("nexo_auth_token") || "";
 
 const api = axios.create({
   baseURL: `${SERVER_URL}/api`,
@@ -57,10 +58,12 @@ export function getServerUrl(): string {
 
 export function setAuthToken(token: string) {
   authToken = token.trim();
+  localStorage.setItem("nexo_auth_token", authToken);
 }
 
 export function clearAuthToken() {
   authToken = "";
+  localStorage.removeItem("nexo_auth_token");
 }
 
 export default api;

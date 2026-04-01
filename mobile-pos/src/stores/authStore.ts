@@ -3,7 +3,10 @@ import { Storage } from '../utils/storage'
 import { setSession, clearSession, getSession } from '../api/client'
 import type { AuthSession, User } from '../types'
 
-const STORAGE_KEYS = ['auth_session', 'server_url', 'cash_session', 'cash_register']
+const STORAGE_KEYS = [
+  'auth_session', 'server_url', 'cash_session', 'cash_register',
+  'receipt_auto', 'printer_mac', 'printer_name', 'printer_auto', 'printer_store_name',
+]
 
 interface AuthState {
   session: AuthSession | null

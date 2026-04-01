@@ -6,7 +6,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Feather } from '@expo/vector-icons'
 import { useAuthStore } from '../../src/stores/authStore'
-import { listSales, voidSale, downloadReceipt } from '../../src/api/sales'
+import { usePrinterStore } from '../../src/stores/printerStore'
+import { listSales, voidSale } from '../../src/api/sales'
+import { fetchStoreConfig } from '../../src/api/config'
+import ReceiptPreviewModal from '../../src/components/pos/ReceiptPreviewModal'
 import { clp } from '../../src/utils/currency'
 import { formatServerDate, formatServerTime, formatServerDateTime } from '../../src/utils/date'
 import tw, { colors } from '../../src/utils/tw'
@@ -26,7 +29,8 @@ const METHOD_LABEL: Record<string, string> = { cash: 'Efectivo', card: 'Tarjeta'
 
 export default function SalesScreen() {
   const { user } = useAuthStore()
-  const isAdmin = user?.role === 'admin'
+  const isAdmin   = user?.role === 'admin'
+  const printer   = usePrinterStore()
 
   const [range, setRange]               = useState<RangeFilter>('today')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
@@ -36,7 +40,12 @@ export default function SalesScreen() {
   const [refreshing, setRefreshing]     = useState(false)
   const [selected, setSelected]         = useState<Sale | null>(null)
   const [voiding, setVoiding]           = useState(false)
-  const [downloading, setDownloading]   = useState(false)
+  const [receipt, setReceipt]           = useState<Sale | null>(null)
+  const [storeName, setStoreName]       = useState(printer.storeName)
+
+  useEffect(() => {
+    fetchStoreConfig().then((c) => setStoreName(c.store_name)).catch(() => {})
+  }, [])
 
   const fetchSales = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
@@ -87,16 +96,6 @@ export default function SalesScreen() {
     )
   }
 
-  const handleDownload = async (sale: Sale) => {
-    setDownloading(true)
-    try {
-      await downloadReceipt(sale.id, sale.sale_number)
-    } catch (err: any) {
-      Alert.alert('Error', err?.message ?? 'No se pudo descargar el recibo')
-    } finally {
-      setDownloading(false)
-    }
-  }
 
   const renderSale = ({ item: sale }: { item: Sale }) => {
     const isVoided = sale.status === 'voided'
@@ -139,7 +138,7 @@ export default function SalesScreen() {
             }]}>
               {clp(sale.total)}
             </Text>
-            <Feather name="chevron-right" size={14} color={colors.gray300} style={{ marginTop: 4 }} />
+            <Feather name="chevron-right" size={14} color={colors.gray200} style={{ marginTop: 4 }} />
           </View>
         </View>
       </TouchableOpacity>
@@ -299,13 +298,13 @@ export default function SalesScreen() {
                   {selected.tax_amount > 0 && (
                     <View style={tw`flex-row justify-between mb-2`}>
                       <Text style={{ color: colors.gray500 }}>Subtotal (sin IVA)</Text>
-                      <Text style={{ color: colors.gray700, fontWeight: '600' }}>{clp(selected.subtotal)}</Text>
+                      <Text style={{ color: colors.gray800, fontWeight: '600' }}>{clp(selected.subtotal)}</Text>
                     </View>
                   )}
                   {selected.tax_amount > 0 && (
                     <View style={tw`flex-row justify-between mb-2`}>
                       <Text style={{ color: colors.gray500 }}>IVA (19%)</Text>
-                      <Text style={{ color: colors.gray700, fontWeight: '600' }}>{clp(selected.tax_amount)}</Text>
+                      <Text style={{ color: colors.gray800, fontWeight: '600' }}>{clp(selected.tax_amount)}</Text>
                     </View>
                   )}
                   {selected.discount_amount > 0 && (
@@ -331,19 +330,19 @@ export default function SalesScreen() {
                   {selected.cash_amount > 0 && (
                     <View style={tw`flex-row justify-between`}>
                       <Text style={{ color: colors.gray500, fontSize: 13 }}>Efectivo recibido</Text>
-                      <Text style={{ color: colors.gray700, fontWeight: '600', fontSize: 13 }}>{clp(selected.cash_amount)}</Text>
+                      <Text style={{ color: colors.gray800, fontWeight: '600', fontSize: 13 }}>{clp(selected.cash_amount)}</Text>
                     </View>
                   )}
                   {selected.card_amount > 0 && (
                     <View style={tw`flex-row justify-between`}>
                       <Text style={{ color: colors.gray500, fontSize: 13 }}>Tarjeta</Text>
-                      <Text style={{ color: colors.gray700, fontWeight: '600', fontSize: 13 }}>{clp(selected.card_amount)}</Text>
+                      <Text style={{ color: colors.gray800, fontWeight: '600', fontSize: 13 }}>{clp(selected.card_amount)}</Text>
                     </View>
                   )}
                   {selected.transfer_amount > 0 && (
                     <View style={tw`flex-row justify-between`}>
                       <Text style={{ color: colors.gray500, fontSize: 13 }}>Transferencia</Text>
-                      <Text style={{ color: colors.gray700, fontWeight: '600', fontSize: 13 }}>{clp(selected.transfer_amount)}</Text>
+                      <Text style={{ color: colors.gray800, fontWeight: '600', fontSize: 13 }}>{clp(selected.transfer_amount)}</Text>
                     </View>
                   )}
                   {selected.change_amount > 0 && (
@@ -367,14 +366,11 @@ export default function SalesScreen() {
                 {/* Actions */}
                 <View style={[tw`flex-row`, { gap: 10 }]}>
                   <TouchableOpacity
-                    onPress={() => handleDownload(selected)}
-                    disabled={downloading}
-                    style={[tw`flex-1 flex-row items-center justify-center py-4 rounded-2xl gap-2`, { backgroundColor: colors.primary }]}
+                    onPress={() => setReceipt(selected)}
+                    style={[tw`flex-1 flex-row items-center justify-center py-4 rounded-2xl gap-2`, { backgroundColor: colors.gray800 }]}
                   >
-                    {downloading
-                      ? <ActivityIndicator color="#fff" size="small" />
-                      : <><Feather name="download" size={16} color="#fff" /><Text style={tw`font-bold text-white`}>Descargar boleta</Text></>
-                    }
+                    <Feather name="printer" size={16} color="#fff" />
+                    <Text style={tw`font-bold text-white`}>Ver boleta</Text>
                   </TouchableOpacity>
                   {isAdmin && selected.status === 'completed' && (
                     <TouchableOpacity
@@ -395,6 +391,14 @@ export default function SalesScreen() {
           </View>
         )}
       </Modal>
+
+      {receipt && (
+        <ReceiptPreviewModal
+          sale={receipt}
+          storeName={storeName}
+          onClose={() => setReceipt(null)}
+        />
+      )}
 
     </SafeAreaView>
   )

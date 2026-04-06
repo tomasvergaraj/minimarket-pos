@@ -20,7 +20,8 @@ class PurchaseOrder(Base):
     order_number: Mapped[int] = mapped_column(Integer, nullable=False)  # auto-incremental por app
     supplier_id: Mapped[str] = mapped_column(String(36), ForeignKey("suppliers.id"), nullable=False)
     status: Mapped[PurchaseOrderStatus] = mapped_column(
-        SAEnum(PurchaseOrderStatus), default=PurchaseOrderStatus.DRAFT, nullable=False
+        SAEnum(PurchaseOrderStatus, values_callable=lambda x: [e.value for e in x]),
+        default=PurchaseOrderStatus.DRAFT, nullable=False
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     subtotal: Mapped[float] = mapped_column(Numeric(12, 2), default=0)

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_admin
+from app.api.deps import require_admin, require_feature
 from app.db.session import get_db
 from app.models.kardex import KardexEntry, MovementType
 from app.models.product import Product
@@ -19,7 +19,11 @@ from app.schemas.purchase_order import (
     ReceivePurchaseOrderInput,
 )
 
-router = APIRouter(prefix="/purchases", tags=["purchases"])
+router = APIRouter(
+    prefix="/purchases",
+    tags=["purchases"],
+    dependencies=[Depends(require_feature("purchases"))],
+)
 
 
 def _enrich_order(order: PurchaseOrder, db: Session) -> PurchaseOrderOut:

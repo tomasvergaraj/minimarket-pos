@@ -33,7 +33,8 @@
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",
         "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.BLUETOOTH_SCAN"
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -41,12 +42,20 @@
     },
     "plugins": [
       "expo-router",
-      "expo-barcode-scanner",
-      "expo-sharing",
+"expo-sharing",
       [
         "expo-camera",
-        { "cameraPermission": "Requerido para escanear códigos de barras" }
+        {
+          "cameraPermission": "Requerido para escanear códigos de barras"
+        }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c45e5ba3-87ff-42a9-bfae-102bd3417ff9"
+      }
+    },
+    "owner": "tomasvergaraj"
   }
 }

@@ -63,7 +63,21 @@ export default function InventoryPage() {
 
   const columns: Column<Product>[] = [
     { key: 'sku', header: 'SKU', render: (r) => <span className="font-mono text-xs text-text-muted">{r.sku}</span>, sortable: true },
-    { key: 'name', header: 'Producto', render: (r) => <span className="font-medium text-text-primary">{r.name}</span>, sortable: true },
+    {
+      key: 'name',
+      header: 'Producto',
+      render: (r) => (
+        <span className="flex items-center gap-1.5 font-medium text-text-primary">
+          {r.name}
+          {r.is_pack && (
+            <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-semibold">
+              Pack ×{r.units_contained}
+            </span>
+          )}
+        </span>
+      ),
+      sortable: true,
+    },
     { key: 'category', header: 'Categoría', render: (r) => r.category || '—' },
     {
       key: 'stock',
@@ -124,15 +138,10 @@ export default function InventoryPage() {
   const handleMovement = async (data: KardexCreate) => {
     try {
       await createMovement(data)
-      setProducts((prev) =>
-        prev.map((p) =>
-          p.id === data.product_id
-            ? { ...p, stock: p.stock + data.quantity }
-            : p
-        )
-      )
       toast.success('Movimiento registrado')
       setMovementTarget(null)
+      // Reload all products so pack-derived stocks recalculate correctly
+      loadProducts()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al registrar movimiento')
     }
@@ -204,8 +213,7 @@ export default function InventoryPage() {
           open={!!movementTarget}
           onClose={() => setMovementTarget(null)}
           onSave={handleMovement}
-          productId={movementTarget.id}
-          productName={movementTarget.name}
+          product={movementTarget}
         />
       )}
     </div>

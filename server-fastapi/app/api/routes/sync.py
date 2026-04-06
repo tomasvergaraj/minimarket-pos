@@ -3,13 +3,17 @@ from datetime import datetime
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_admin
+from app.api.deps import get_db, require_admin, require_feature
 from app.core.config import ROOT_DIR, settings
 from app.core.limiter import limiter
 from app.models.sync_log import SyncLog
 from app.schemas.sync import SyncConfigOut, SyncConfigUpdate, SyncLogOut, SyncStatus
 
-router = APIRouter(prefix="/sync", tags=["sync"])
+router = APIRouter(
+    prefix="/sync",
+    tags=["sync"],
+    dependencies=[Depends(require_feature("cloud_sync"))],
+)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

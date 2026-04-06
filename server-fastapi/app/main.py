@@ -70,6 +70,9 @@ ADMIN_INDEX_HEADERS = {
     "Pragma": "no-cache",
     "Expires": "0",
 }
+
+MOBILE_WEB_DIST_DIR = ROOT_DIR.parent / "mobile-web" / "dist"
+MOBILE_WEB_INDEX_FILE = MOBILE_WEB_DIST_DIR / "index.html"
 ADMIN_COMPAT_PATHS = (
     "login",
     "products",
@@ -262,4 +265,42 @@ def serve_admin_web(full_path: str = ""):
             raise HTTPException(status_code=404, detail="Admin web is not built")
         raise HTTPException(status_code=404, detail="Admin asset not found")
     headers = ADMIN_INDEX_HEADERS if target == ADMIN_INDEX_FILE else None
+    return FileResponse(target, headers=headers)
+
+
+def _resolve_mobile_web_asset(full_path: str) -> Path | None:
+    if not MOBILE_WEB_INDEX_FILE.exists():
+        return None
+
+    if not full_path:
+        return MOBILE_WEB_INDEX_FILE
+
+    candidate = (MOBILE_WEB_DIST_DIR / full_path).resolve()
+    dist_root = MOBILE_WEB_DIST_DIR.resolve()
+    if not candidate.is_relative_to(dist_root):
+        return None
+
+    if candidate.is_file():
+        return candidate
+
+    if candidate.suffix:
+        return None
+
+    return MOBILE_WEB_INDEX_FILE
+
+
+@app.get("/pos", include_in_schema=False)
+def redirect_mobile_web_root():
+    return RedirectResponse(url="/pos/", status_code=307, headers=ADMIN_INDEX_HEADERS)
+
+
+@app.get("/pos/", include_in_schema=False)
+@app.get("/pos/{full_path:path}", include_in_schema=False)
+def serve_mobile_web(full_path: str = ""):
+    target = _resolve_mobile_web_asset(full_path)
+    if not target:
+        if not MOBILE_WEB_INDEX_FILE.exists():
+            raise HTTPException(status_code=404, detail="Mobile web is not built")
+        raise HTTPException(status_code=404, detail="Mobile web asset not found")
+    headers = ADMIN_INDEX_HEADERS if target == MOBILE_WEB_INDEX_FILE else None
     return FileResponse(target, headers=headers)

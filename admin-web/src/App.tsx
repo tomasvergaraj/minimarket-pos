@@ -74,18 +74,18 @@ export default function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 3000,
+              style: {
+                fontSize: '14px',
+                borderRadius: '6px',
+                padding: '8px 12px',
+              },
+            }}
+          />
         </LicenseProvider>
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 3000,
-            style: {
-              fontSize: '14px',
-              borderRadius: '6px',
-              padding: '8px 12px',
-            },
-          }}
-        />
       </AuthProvider>
     </QueryClientProvider>
   )

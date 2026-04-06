@@ -12,7 +12,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_admin
+from app.api.deps import require_admin, require_feature
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.sale import Sale
@@ -20,7 +20,11 @@ from app.models.sii_folio import SIIFolioCounter
 from app.tax.sii.caf import load_caf_from_file
 from app.tax.sii.service import background_upload, emit_boleta, is_configured
 
-router = APIRouter(prefix="/tax/sii", tags=["sii"])
+router = APIRouter(
+    prefix="/tax/sii",
+    tags=["sii"],
+    dependencies=[Depends(require_feature("sii"))],
+)
 
 
 @router.get("/status")

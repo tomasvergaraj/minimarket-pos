@@ -395,25 +395,6 @@ export async function updateUser(id: string, data: UserUpdate): Promise<User> {
   return res.data.data ?? res.data
 }
 
-// ── Auth ──
-
-export async function loginWithPin(pin: string): Promise<AuthSession> {
-  if (USE_MOCKS) {
-    await delay()
-    const user = pin === '1234' ? mockUsers[0] : pin === '0000' ? mockUsers[1] : null
-    if (!user) throw new Error('PIN incorrecto')
-    return {
-      access_token: 'mock-token',
-      refresh_token: 'mock-refresh-token',
-      token_type: 'bearer',
-      expires_in: 60 * 60,
-      user,
-    }
-  }
-  const res = await api.post('/users/login/pin', { pin })
-  return res.data.data ?? res.data
-}
-
 // ── Inventory / Kardex ──
 
 export async function fetchKardex(productId: string): Promise<KardexEntry[]> {
@@ -751,6 +732,11 @@ export async function updateSyncConfig(data: { supabase_url: string; supabase_ke
 
 export async function triggerSync(): Promise<{ message: string; log_id: number }> {
   const res = await api.post('/sync/trigger')
+  return res.data
+}
+
+export async function loginWithPin(pin: string): Promise<AuthSession> {
+  const res = await api.post<AuthSession>('/users/login/pin', { pin })
   return res.data
 }
 

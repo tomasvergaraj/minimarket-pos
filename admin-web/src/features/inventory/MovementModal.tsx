@@ -1,16 +1,16 @@
 import { useState } from 'react'
+import { Package } from 'lucide-react'
 import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import Button from '../../components/ui/Button'
-import type { KardexCreate } from '../../types'
+import type { KardexCreate, Product } from '../../types'
 
 interface MovementModalProps {
   open: boolean
   onClose: () => void
   onSave: (data: KardexCreate) => void
-  productId: string
-  productName: string
+  product: Product
   loading?: boolean
 }
 
@@ -24,22 +24,34 @@ export default function MovementModal({
   open,
   onClose,
   onSave,
-  productId,
-  productName,
+  product,
   loading,
 }: MovementModalProps) {
   const [type, setType] = useState('restock')
   const [quantity, setQuantity] = useState('')
   const [notes, setNotes] = useState('')
 
+  const isPack = product.is_pack && product.units_contained > 1
+  const units = isPack ? product.units_contained : 1
+  const qty = parseInt(quantity) || 0
+  const baseUnits = qty * units
+
+  const helper = isPack
+    ? qty > 0
+      ? `${qty} pack${qty !== 1 ? 's' : ''} = ${baseUnits} unidades base (${type === 'shrinkage' ? 'se restarán' : 'se sumarán'})`
+      : `1 pack = ${units} unidades base`
+    : type === 'shrinkage'
+    ? 'Se restará del stock'
+    : 'Se sumará al stock'
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const qty = Number(quantity)
-    if (!qty) return
+    const q = Math.abs(parseInt(quantity) || 0)
+    if (!q) return
     onSave({
-      product_id: productId,
+      product_id: product.id,
       movement_type: type as KardexCreate['movement_type'],
-      quantity: type === 'restock' ? Math.abs(qty) : -Math.abs(qty),
+      quantity: q,
       notes: notes || null,
     })
     setType('restock')
@@ -48,8 +60,17 @@ export default function MovementModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={`Movimiento — ${productName}`} size="sm">
+    <Modal open={open} onClose={onClose} title={`Movimiento — ${product.name}`} size="sm">
       <form onSubmit={handleSubmit} className="space-y-4">
+        {isPack && (
+          <div className="flex items-start gap-2 rounded-lg bg-purple-50 border border-purple-200 px-3 py-2.5 text-xs text-purple-800">
+            <Package className="w-3.5 h-3.5 mt-0.5 shrink-0 text-purple-500" />
+            <span>
+              <strong>Pack ×{units}:</strong> el ajuste se aplica sobre el producto base.
+              El stock del pack se recalcula automáticamente.
+            </span>
+          </div>
+        )}
         <Select
           label="Tipo de movimiento"
           options={typeOptions}
@@ -57,13 +78,13 @@ export default function MovementModal({
           onChange={(e) => setType(e.target.value)}
         />
         <Input
-          label="Cantidad"
+          label={isPack ? 'Cantidad (en packs)' : 'Cantidad'}
           type="number"
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
           required
           min={1}
-          helper={type === 'restock' ? 'Se sumará al stock' : 'Se restará del stock'}
+          helper={helper}
         />
         <Input
           label="Notas (opcional)"

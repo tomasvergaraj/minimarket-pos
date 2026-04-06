@@ -4,14 +4,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from app.api.deps import get_current_user, require_operational_license
+from app.api.deps import get_current_user, require_operational_license, require_feature
 from app.db.session import get_db
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.product import Product
 from app.models.user import User
 from app.schemas.order import OrderCreate, OrderPatch, OrderOut
 
-router = APIRouter(prefix="/orders", tags=["orders"])
+router = APIRouter(
+    prefix="/orders",
+    tags=["orders"],
+    dependencies=[Depends(require_feature("orders"))],
+)
 
 
 def _next_order_number(db: Session) -> int:

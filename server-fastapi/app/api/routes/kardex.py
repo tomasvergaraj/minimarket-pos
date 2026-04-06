@@ -22,6 +22,50 @@ def create_movement(
         raise HTTPException(404, "Product not found")
 
     movement = MovementType(data.movement_type)
+
+    # Pack products don't own their own stock — their effective stock is derived as
+    # base_product.stock // units_contained.  So we must adjust the base product instead,
+    # scaling the quantity by units_contained.
+    if product.is_pack and product.base_product_id:
+        base_product = (
+            db.query(Product)
+            .filter(Product.id == product.base_product_id)
+            .with_for_update()
+            .first()
+        )
+        if not base_product:
+            raise HTTPException(404, "Base product not found")
+
+        units = max(int(product.units_contained), 1)
+        effective_qty = abs(data.quantity) * units
+
+        stock_before = base_product.stock
+        if movement == MovementType.RESTOCK:
+            base_product.stock += effective_qty
+        elif movement == MovementType.SHRINKAGE:
+            base_product.stock -= effective_qty
+        elif movement == MovementType.ADJUSTMENT:
+            base_product.stock += data.quantity * units
+        else:
+            raise HTTPException(400, "Use sales endpoint for sale movements")
+
+        note = f"[Pack: {product.name} ×{data.quantity}] {data.notes or ''}".strip()
+        entry = KardexEntry(
+            product_id=base_product.id,
+            movement_type=movement,
+            quantity=effective_qty,
+            stock_before=stock_before,
+            stock_after=base_product.stock,
+            reference_id=data.reference_id,
+            notes=note,
+            user_id=current_user.id,
+        )
+        db.add(entry)
+        db.commit()
+        db.refresh(entry)
+        return entry
+
+    # Regular (non-pack) product
     stock_before = product.stock
 
     if movement == MovementType.RESTOCK:

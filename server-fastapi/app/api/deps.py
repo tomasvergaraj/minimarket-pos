@@ -8,6 +8,41 @@ from app.models.user import User
 from app.services.license_service import LicenseError, ensure_operational_license
 
 
+def require_feature(feature: str):
+    """Dependency factory: blocks the endpoint unless the license includes *feature*.
+
+    Backward-compatible: licenses with an empty features list (old format) grant
+    access to everything so existing customers are never broken.
+
+    Usage:
+        @router.get("/...", dependencies=[Depends(require_feature("sii"))])
+        # or at router level:
+        router = APIRouter(..., dependencies=[Depends(require_feature("orders"))])
+    """
+    def _dep(db: Session = Depends(get_db)) -> None:
+        try:
+            status = ensure_operational_license(db)
+        except LicenseError as exc:
+            raise HTTPException(
+                status_code=403,
+                detail={"code": exc.code, "message": exc.message},
+            ) from exc
+        features: list[str] = status.get("features") or []
+        # Empty list = old license with no feature flags → allow all (grandfather)
+        if features and feature not in features:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "FEATURE_NOT_LICENSED",
+                    "message": (
+                        f"Tu licencia no incluye el módulo «{feature}». "
+                        "Contacta a tu proveedor para actualizar tu plan."
+                    ),
+                },
+            )
+    return _dep
+
+
 bearer_scheme = HTTPBearer(auto_error=False)
 
 

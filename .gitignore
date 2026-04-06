@@ -20,3 +20,10 @@ server-fastapi/logs/
 
 # Generated delivery bundles
 deploy/output/
+
+# Temporary / generated local files
+artifacts/
+barcode-docx-*/
+*.docx
+*.xlsx
+!supabase_schema.sql

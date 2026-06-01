@@ -42,6 +42,7 @@ def sii_status(db: Session = Depends(get_db)):
         for k, v in {
             "SII_CAF_XML_PATH": settings.SII_CAF_XML_PATH,
             "SII_CERT_PFX_PATH": settings.SII_CERT_PFX_PATH,
+            "SII_SENDER_RUT": settings.SII_SENDER_RUT,
             "STORE_RUT": settings.STORE_RUT,
             "STORE_NAME": settings.STORE_NAME,
             "STORE_GIRO": settings.STORE_GIRO,

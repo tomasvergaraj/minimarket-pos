@@ -98,7 +98,13 @@ def _int_to_bytes(number: int) -> bytes:
 def _build_signed_seed_xml(semilla: str) -> str:
     """
     Construye <getToken> firmado con XML-DSig para GetTokenFromSeed.
-    Formato requerido por SII (cap. 4.1.5 / cap. 8 manual autenticación).
+
+    El SII requiere:
+      - <Signature xmlns:ds="..."> con prefijo ds: para que <Certificate>
+        (sin namespace) dentro de <ds:X509Data> quede en namespace VACÍO.
+        El parser del SII busca Certificate con getElementsByTagNameNS("","Certificate")
+        y solo lo encuentra cuando está en namespace vacío, lo cual ocurre
+        únicamente cuando el padre usa prefijo (no namespace por defecto).
     """
     with open(settings.SII_CERT_PFX_PATH, "rb") as f:
         pfx_data = f.read()
@@ -109,73 +115,68 @@ def _build_signed_seed_xml(semilla: str) -> str:
     if private_key is None or certificate is None:
         raise ValueError("No se pudo extraer llave privada/certificado desde SII_CERT_PFX_PATH")
 
+    cert_der = certificate.public_bytes(serialization.Encoding.DER)
+    cert_b64 = base64.b64encode(cert_der).decode("ascii")
+
+    public_numbers = certificate.public_key().public_numbers()
+    modulus_b64 = base64.b64encode(_int_to_bytes(public_numbers.n)).decode("ascii")
+    exponent_b64 = base64.b64encode(_int_to_bytes(public_numbers.e)).decode("ascii")
+
     root = etree.Element("getToken")
     item = etree.SubElement(root, "item")
-    semilla_elem = etree.SubElement(item, "Semilla")
-    semilla_elem.text = semilla
+    etree.SubElement(item, "Semilla").text = semilla
 
+    # Prefijo ds: — NO default namespace — para que <Certificate> quede en ns vacío.
+    # xmlns:ds se declara en <ds:Signature> Y en <ds:SignedInfo> explícitamente:
+    # algunos validadores C14N (incluyendo el del SII) no incluyen ns heredados
+    # del padre, por lo que la declaración en el nodo firmado es necesaria.
     signature = etree.SubElement(
         root,
         f"{{{XMLDSIG}}}Signature",
         nsmap={XMLDSIG_PREFIX: XMLDSIG},
     )
-    signed_info = etree.SubElement(signature, f"{{{XMLDSIG}}}SignedInfo")
-    canonicalization = etree.SubElement(signed_info, f"{{{XMLDSIG}}}CanonicalizationMethod")
-    canonicalization.set("Algorithm", XML_C14N_STD)
-    signature_method = etree.SubElement(signed_info, f"{{{XMLDSIG}}}SignatureMethod")
-    signature_method.set("Algorithm", f"{XMLDSIG}rsa-sha1")
+    signed_info = etree.SubElement(
+        signature,
+        f"{{{XMLDSIG}}}SignedInfo",
+        nsmap={XMLDSIG_PREFIX: XMLDSIG},
+    )
+    cm = etree.SubElement(signed_info, f"{{{XMLDSIG}}}CanonicalizationMethod")
+    cm.set("Algorithm", XML_C14N_STD)
+    sm = etree.SubElement(signed_info, f"{{{XMLDSIG}}}SignatureMethod")
+    sm.set("Algorithm", f"{XMLDSIG}rsa-sha1")
+    ref = etree.SubElement(signed_info, f"{{{XMLDSIG}}}Reference")
+    ref.set("URI", "")
+    transforms = etree.SubElement(ref, f"{{{XMLDSIG}}}Transforms")
+    tr = etree.SubElement(transforms, f"{{{XMLDSIG}}}Transform")
+    tr.set("Algorithm", f"{XMLDSIG}enveloped-signature")
+    etree.SubElement(ref, f"{{{XMLDSIG}}}DigestMethod").set("Algorithm", f"{XMLDSIG}sha1")
+    digest_value = etree.SubElement(ref, f"{{{XMLDSIG}}}DigestValue")
 
-    reference = etree.SubElement(signed_info, f"{{{XMLDSIG}}}Reference")
-    reference.set("URI", "")
-    transforms = etree.SubElement(reference, f"{{{XMLDSIG}}}Transforms")
-    transform = etree.SubElement(transforms, f"{{{XMLDSIG}}}Transform")
-    transform.set("Algorithm", f"{XMLDSIG}enveloped-signature")
-    digest_method = etree.SubElement(reference, f"{{{XMLDSIG}}}DigestMethod")
-    digest_method.set("Algorithm", f"{XMLDSIG}sha1")
-    digest_value = etree.SubElement(reference, f"{{{XMLDSIG}}}DigestValue")
-
-    # Digest del documento getToken sin el nodo Signature (enveloped-signature).
+    # Digest sobre el documento sin Signature
     root_for_digest = etree.fromstring(etree.tostring(root))
-    sig_for_digest = root_for_digest.find(f"{{{XMLDSIG}}}Signature")
-    if sig_for_digest is not None:
-        root_for_digest.remove(sig_for_digest)
+    sig_node = root_for_digest.find(f"{{{XMLDSIG}}}Signature")
+    if sig_node is not None:
+        root_for_digest.remove(sig_node)
     digest_bytes = hashlib.sha1(_c14n_standard(root_for_digest)).digest()
     digest_value.text = base64.b64encode(digest_bytes).decode("ascii")
 
     signed_info_c14n = _c14n_standard(signed_info)
-    signature_bytes = private_key.sign(
-        signed_info_c14n,
-        asym_padding.PKCS1v15(),
-        hashes.SHA1(),
-    )
+    sig_bytes = private_key.sign(signed_info_c14n, asym_padding.PKCS1v15(), hashes.SHA1())
     signature_value = etree.SubElement(signature, f"{{{XMLDSIG}}}SignatureValue")
-    signature_value.text = base64.b64encode(signature_bytes).decode("ascii")
-
-    public_numbers = certificate.public_key().public_numbers()
-    modulus_b64 = base64.b64encode(_int_to_bytes(public_numbers.n)).decode("ascii")
-    exponent_b64 = base64.b64encode(_int_to_bytes(public_numbers.e)).decode("ascii")
-    cert_der = certificate.public_bytes(serialization.Encoding.DER)
-    cert_b64 = base64.b64encode(cert_der).decode("ascii")
+    signature_value.text = base64.b64encode(sig_bytes).decode("ascii")
 
     key_info = etree.SubElement(signature, f"{{{XMLDSIG}}}KeyInfo")
-    key_value = etree.SubElement(key_info, f"{{{XMLDSIG}}}KeyValue")
-    rsa_key_value = etree.SubElement(key_value, f"{{{XMLDSIG}}}RSAKeyValue")
-    modulus = etree.SubElement(rsa_key_value, f"{{{XMLDSIG}}}Modulus")
-    modulus.text = modulus_b64
-    exponent = etree.SubElement(rsa_key_value, f"{{{XMLDSIG}}}Exponent")
-    exponent.text = exponent_b64
+    kv = etree.SubElement(key_info, f"{{{XMLDSIG}}}KeyValue")
+    rsa_kv = etree.SubElement(kv, f"{{{XMLDSIG}}}RSAKeyValue")
+    etree.SubElement(rsa_kv, f"{{{XMLDSIG}}}Modulus").text = modulus_b64
+    etree.SubElement(rsa_kv, f"{{{XMLDSIG}}}Exponent").text = exponent_b64
     x509_data = etree.SubElement(key_info, f"{{{XMLDSIG}}}X509Data")
-    x509_certificate = etree.SubElement(x509_data, f"{{{XMLDSIG}}}X509Certificate")
-    x509_certificate.text = cert_b64
-    # Compatibilidad con validadores SII que reportan "Certificate" (estado 11).
-    certificate_alias = etree.SubElement(x509_data, f"{{{XMLDSIG}}}Certificate")
-    certificate_alias.text = cert_b64
-    # Alias sin namespace para parsers legacy.
-    certificate_plain = etree.SubElement(x509_data, "Certificate")
-    certificate_plain.text = cert_b64
+    etree.SubElement(x509_data, f"{{{XMLDSIG}}}X509Certificate").text = cert_b64
+    # <Certificate> sin namespace → queda en ns vacío dentro del scope ds: (no default ns)
+    etree.SubElement(x509_data, "Certificate").text = cert_b64
 
-    xml_bytes = etree.tostring(root, encoding="utf-8", xml_declaration=True)
-    xml = xml_bytes.decode("utf-8")
+    xml = etree.tostring(root, encoding="unicode")
+    logger.debug("getToken XML enviado a SII:\n%s", xml)
     return xml
 
 
@@ -276,6 +277,7 @@ async def _get_token(client: httpx.AsyncClient, semilla: str) -> str:
         follow_redirects=True,
         timeout=15.0,
     )
+    logger.debug("GetTokenFromSeed respuesta HTTP %s:\n%s", response.status_code, response.text[:2000])
     try:
         root = _parse_sii_xml(response.content)
     except etree.XMLSyntaxError:

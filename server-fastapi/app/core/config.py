@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     SII_CERT_PFX_PATH: str = ""       # ruta absoluta al archivo .pfx
     SII_CERT_PFX_PASSWORD: str = ""   # contraseña del .pfx
     SII_CAF_XML_PATH: str = ""        # ruta absoluta al archivo CAF XML de SII
+    SII_SENDER_RUT: str = ""          # RUT del certificado que envia al SII
     STORE_GIRO: str = ""              # giro comercial, ej: "COMERCIO AL POR MENOR"
     STORE_ACTECO: int = 0             # código actividad económica SII, ej: 521010
     STORE_COMUNA: str = ""            # ej: "Santiago"

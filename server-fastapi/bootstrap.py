@@ -68,6 +68,7 @@ def build_env_lines(args: argparse.Namespace) -> list[str]:
         "SII_CERT_PFX_PATH=",
         "SII_CERT_PFX_PASSWORD=",
         "SII_CAF_XML_PATH=",
+        "SII_SENDER_RUT=",
         "STORE_GIRO=",
         "STORE_ACTECO=521010",
         "STORE_COMUNA=Santiago",

@@ -1,0 +1,9 @@
+# Material sensible SII (NO commitear)
+*.pfx
+FoliosSII*.xml
+sii_semilla_firmada.xml
+*_semilla_firmada.xml
+
+# Artefactos de prueba/certificación SII
+boletas_test/
+Set Prueba*.txt

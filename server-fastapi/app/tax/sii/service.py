@@ -161,11 +161,11 @@ async def background_upload(sale_id: str, xml_bytes: bytes) -> None:
 
     db = SessionLocal()
     try:
-        rut_digits = _rut_digits(settings.STORE_RUT)
+        sender_rut = settings.SII_SENDER_RUT or settings.STORE_RUT
         result = await upload_dte(
             dte_xml_bytes=xml_bytes,
-            rut_sender=rut_digits,
-            rut_company=rut_digits,
+            rut_sender=_rut_digits(sender_rut),
+            rut_company=_rut_digits(settings.STORE_RUT),
         )
         status_code = result.get("status", "UNKNOWN")
         # SII retorna "0" como éxito en muchos endpoints
